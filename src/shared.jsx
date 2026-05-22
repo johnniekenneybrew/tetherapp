@@ -174,7 +174,7 @@ export function TopBar({ route, setRoute, dateLabel, onHubTab }) {
   return (
     <header className="topbar">
       <div className="topbar-inner">
-        <div className="brand">
+        <div className="brand" onClick={() => setRoute({ page: "checkin" })} style={{ cursor: "pointer" }}>
           <svg width="120" height="32" viewBox="0 0 160 40" fill="none" xmlns="http://www.w3.org/2000/svg">
             <line x1="8" y1="20" x2="20" y2="8" stroke="#6C63FF" strokeWidth="2" strokeLinecap="round"/>
             <line x1="20" y1="8" x2="32" y2="20" stroke="#6C63FF" strokeWidth="2" strokeLinecap="round"/>
