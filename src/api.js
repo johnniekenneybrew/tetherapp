@@ -118,3 +118,11 @@ export const contactGroupsApi = {
   update: (id, patch_) => patch("/contact-groups", { id, ...patch_ }),
   delete: (id)         => del("/contact-groups", { id }),
 };
+
+// ============================================================
+// User preferences (cross-device, Notion-backed)
+// ============================================================
+export const prefsApi = {
+  get: (key, userId) => get("/prefs", { key, userId }),
+  set: (key, value, userId) => post("/prefs", { key, value, userId }),
+};

@@ -1,5 +1,6 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useUser } from '@clerk/clerk-react';
+import { prefsApi } from './api';
 
 function applyOrder(orderIds, items) {
   if (!orderIds || !orderIds.length) return items;
@@ -12,14 +13,31 @@ function applyOrder(orderIds, items) {
 
 export function useOrder(storageKey, items) {
   const { user } = useUser();
-  const scopedKey = user?.id ? `${user.id}_${storageKey}` : storageKey;
+  const userId = user?.id || "";
+  const scopedKey = userId ? `${userId}_${storageKey}` : storageKey;
   const scopedKeyRef = useRef(scopedKey);
   scopedKeyRef.current = scopedKey;
+  const userIdRef = useRef(userId);
+  userIdRef.current = userId;
 
+  // Init from localStorage for instant render
   const [orderIds, setOrderIds] = useState(() => {
     try { return JSON.parse(localStorage.getItem(scopedKey)) || null; }
     catch { return null; }
   });
+
+  // Sync from Notion on mount — cross-device source of truth
+  useEffect(() => {
+    if (!userId) return;
+    prefsApi.get(storageKey, userId)
+      .then(({ value }) => {
+        if (value && Array.isArray(value)) {
+          try { localStorage.setItem(scopedKeyRef.current, JSON.stringify(value)); } catch {}
+          setOrderIds(value);
+        }
+      })
+      .catch(() => {});
+  }, [storageKey, userId]);
 
   const ordered = applyOrder(orderIds, items);
 
@@ -33,7 +51,11 @@ export function useOrder(storageKey, items) {
       const next = [...ids];
       next.splice(from, 1);
       next.splice(to, 0, fromId);
+      // Save locally for instant feedback
       try { localStorage.setItem(scopedKeyRef.current, JSON.stringify(next)); } catch {}
+      // Save to Notion for cross-device sync
+      const uid = userIdRef.current;
+      if (uid) prefsApi.set(storageKey, next, uid).catch(console.error);
       return next;
     });
   }, [items, storageKey]);

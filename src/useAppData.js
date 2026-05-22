@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useUser } from '@clerk/clerk-react';
 import { TODAY, addDays, weekStart } from './shared';
 import {
   tasksApi, checkinApi, habitsApi, habitLogApi,
   routinesApi, routineLogApi, goalsApi,
   contactsApi, contactNotesApi, contactGroupsApi,
+  prefsApi,
 } from './api';
 
 // ============================================================
@@ -51,13 +52,25 @@ export function useAppData() {
   const [loading, setLoading] = useState(true);
   const [error, setError]   = useState(null);
 
-  // Persist area settings to localStorage whenever they change
+  const areasSaveTimer = useRef(null);
+  const userIdRef = useRef(userId);
+  userIdRef.current = userId;
+
+  // Save area settings — localStorage immediately, Notion debounced
   useEffect(() => {
-    if (state.accounts) {
-      try {
-        const key = userId ? `tether_accounts_${userId}` : 'tether_accounts';
-        localStorage.setItem(key, JSON.stringify(state.accounts));
-      } catch {}
+    if (!state.accounts) return;
+    const uid = userId;
+    // Local cache for instant reload
+    try {
+      const localKey = uid ? `tether_accounts_${uid}` : 'tether_accounts';
+      localStorage.setItem(localKey, JSON.stringify(state.accounts));
+    } catch {}
+    // Notion save debounced (avoids API calls on every keypress)
+    if (uid) {
+      clearTimeout(areasSaveTimer.current);
+      areasSaveTimer.current = setTimeout(() => {
+        prefsApi.set('areas', state.accounts, uid).catch(console.error);
+      }, 800);
     }
   }, [state.accounts, userId]);
 
@@ -109,7 +122,7 @@ export function useAppData() {
 
         setCheckinPageId(checkin._pageId);
 
-        setStateRaw({
+        setStateRaw((prev) => ({
           todos,
           habits,
           routines,
@@ -125,7 +138,23 @@ export function useAppData() {
           },
           contacts: contactsWithNotes,
           contactGroups,
-        });
+          accounts: prev.accounts, // keep already-loaded localStorage value until Notion resolves
+        }));
+
+        // Load area preferences from Notion (cross-device source of truth)
+        const uid = userIdRef.current;
+        if (uid) {
+          prefsApi.get('areas', uid)
+            .then(({ value }) => {
+              if (value && Array.isArray(value)) {
+                setStateRaw((s) => ({ ...s, accounts: value }));
+                try {
+                  localStorage.setItem(`tether_accounts_${uid}`, JSON.stringify(value));
+                } catch {}
+              }
+            })
+            .catch(() => {}); // localStorage fallback already loaded
+        }
       } catch (err) {
         console.error("loadAll failed", err);
         setError(err.message);
