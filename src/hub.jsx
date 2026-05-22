@@ -463,6 +463,7 @@ function GoalsTab({ state, setState, actions }) {
   const [menuOpen, setMenuOpen] = useState(null);
   const [showCompleted, setShowCompleted] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
+  const [editGoal, setEditGoal] = useState(null);
   const [accFilter, setAccFilter] = useState("all");
 
   const allActive = state.goals.filter((g) => g.status !== "completed");
@@ -470,15 +471,10 @@ function GoalsTab({ state, setState, actions }) {
   const done = state.goals.filter((g) => g.status === "completed");
 
   const habitsById = Object.fromEntries(state.habits.map((h) => [h.id, h]));
+  const todosById  = Object.fromEntries(state.todos.map((t) => [t.id, t]));
 
-  const completeGoal = (id) => {
-    actions.updateGoal(id, { status: "completed" });
-    setMenuOpen(null);
-  };
-  const delGoal = (id) => {
-    actions.deleteGoal(id);
-    setMenuOpen(null);
-  };
+  const completeGoal = (id) => { actions.updateGoal(id, { status: "completed" }); setMenuOpen(null); };
+  const delGoal      = (id) => { actions.deleteGoal(id); setMenuOpen(null); };
 
   return (
     <div>
@@ -511,48 +507,81 @@ function GoalsTab({ state, setState, actions }) {
           <div className="goal-head">
             <div style={{ flex: 1 }}>
               <h3 className="goal-name">{g.name}</h3>
-              {g.target && <div className="goal-target">Target {g.target} · {g.description}</div>}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+                {g.kpi && (
+                  <span style={{
+                    fontSize: 11.5, padding: "2px 8px", borderRadius: 20,
+                    background: "color-mix(in srgb, var(--accent) 12%, transparent)",
+                    color: "var(--accent)", fontWeight: 500,
+                  }}>
+                    🎯 {g.kpi}
+                  </span>
+                )}
+                {g.target && (
+                  <span className="tiny" style={{ color: "var(--text-3)" }}>
+                    Target {g.target}
+                  </span>
+                )}
+              </div>
+              {g.description && g.description !== "—" && (
+                <div className="tiny" style={{ marginTop: 4, color: "var(--text-2)" }}>{g.description}</div>
+              )}
             </div>
             <StatusBadge status={g.status} />
             <div style={{ position: "relative" }}
               onMouseEnter={() => setMenuOpen(g.id)}
               onMouseLeave={() => setMenuOpen(null)}>
-              <button className="kebab">
-                <Icon.Kebab />
-              </button>
+              <button className="kebab"><Icon.Kebab /></button>
               {menuOpen === g.id && (
                 <div style={{
                   position: "absolute", top: "100%", right: 0, marginTop: 4,
                   background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 10,
-                  boxShadow: "var(--shadow-pop)", padding: 6, minWidth: 180, zIndex: 5,
+                  boxShadow: "var(--shadow-pop)", padding: 6, minWidth: 160, zIndex: 5,
                 }}>
-                  <MenuItem onClick={() => setMenuOpen(null)}>Edit goal</MenuItem>
-                  <MenuItem onClick={() => setMenuOpen(null)}>Add / remove habits</MenuItem>
+                  <MenuItem onClick={() => { setEditGoal(g); setMenuOpen(null); }}>Edit goal</MenuItem>
                   <MenuItem onClick={() => completeGoal(g.id)}>Mark complete</MenuItem>
                   <MenuItem destructive onClick={() => delGoal(g.id)}>Delete goal</MenuItem>
                 </div>
               )}
             </div>
           </div>
-          <div className="habit-bubbles">
-            {g.habitIds.map((hid) => (
-              <span key={hid} className="pill">
-                <AccountDot acc={habitsById[hid]?.account || "personal"} />
-                {habitsById[hid]?.name || "—"}
-              </span>
-            ))}
-            <button className="pill" style={{ background: "var(--bg)", color: "var(--text-2)", borderStyle: "dashed" }}>
-              <Icon.Plus /> Add habit
-            </button>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14 }}>
-            <div className={"bar " + (g.weekPct >= 80 ? "is-good" : "is-warn")} style={{ flex: 1 }}>
-              <span style={{ width: g.weekPct + "%" }} />
+
+          {/* Linked habits */}
+          {g.habitIds.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <div className="tiny" style={{ color: "var(--text-3)", marginBottom: 5, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Habits</div>
+              <div className="habit-bubbles">
+                {g.habitIds.map((hid) => (
+                  <span key={hid} className="pill">
+                    <AccountDot acc={habitsById[hid]?.account || "personal"} />
+                    {habitsById[hid]?.name || "—"}
+                  </span>
+                ))}
+              </div>
             </div>
-            <span className="tiny" style={{ fontVariantNumeric: "tabular-nums", color: "var(--text)", fontWeight: 600 }}>
-              {g.weekPct}% this week
-            </span>
-          </div>
+          )}
+
+          {/* Linked tasks */}
+          {(g.taskIds || []).length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <div className="tiny" style={{ color: "var(--text-3)", marginBottom: 5, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Tasks</div>
+              <div className="habit-bubbles">
+                {(g.taskIds || []).map((tid) => {
+                  const task = todosById[tid];
+                  return (
+                    <span key={tid} className="pill" style={{ textDecoration: task?.done ? "line-through" : "none", opacity: task?.done ? 0.5 : 1 }}>
+                      {task?.done && <Icon.Check />}
+                      {task?.name || "—"}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {g.habitIds.length === 0 && (g.taskIds || []).length === 0 && (
+            <div className="tiny" style={{ marginTop: 10, color: "var(--text-3)" }}>No habits or tasks linked</div>
+          )}
         </div>
       ))}
 
@@ -578,7 +607,8 @@ function GoalsTab({ state, setState, actions }) {
         )}
       </div>
 
-      {showAdd && <AddGoalModal onClose={() => setShowAdd(false)} state={state} setState={setState} actions={actions} />}
+      {showAdd && <GoalModal onClose={() => setShowAdd(false)} state={state} actions={actions} />}
+      {editGoal && <GoalModal goal={editGoal} onClose={() => setEditGoal(null)} state={state} actions={actions} />}
     </div>
   );
 }
@@ -599,57 +629,86 @@ function MenuItem({ children, onClick, destructive }) {
   );
 }
 
-function AddGoalModal({ onClose, state, setState, actions }) {
-  const [name, setName] = useState("");
-  const [desc, setDesc] = useState("");
-  const [selected, setSelected] = useState([]);
-  const [account, setAccount] = useState("personal");
+function GoalModal({ goal, onClose, state, actions }) {
+  const isEdit = !!goal;
+  const [name, setName]               = useState(goal?.name || "");
+  const [desc, setDesc]               = useState(goal?.description === "—" ? "" : (goal?.description || ""));
+  const [kpi, setKpi]                 = useState(goal?.kpi || "");
+  const [account, setAccount]         = useState(goal?.account || "personal");
+  const [selectedHabits, setHabits]   = useState(goal?.habitIds || []);
+  const [selectedTasks, setTasks]     = useState(goal?.taskIds || []);
   const [showNewHabit, setShowNewHabit] = useState(false);
   const [newHabitName, setNewHabitName] = useState("");
   const [newHabitTarget, setNewHabitTarget] = useState(5);
+  const [taskSearch, setTaskSearch]   = useState("");
+
+  const toggleHabit = (id) => setHabits((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
+  const toggleTask  = (id) => setTasks((s)  => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
 
   const createHabit = () => {
     if (!newHabitName.trim()) return;
     const hid = "h-" + Date.now();
     actions.addHabit({ id: hid, name: newHabitName.trim(), target: newHabitTarget, account: "personal", goals: [] });
-    setSelected((s) => [...s, hid]);
+    setHabits((s) => [...s, hid]);
     setNewHabitName("");
     setShowNewHabit(false);
   };
 
   const save = () => {
     if (!name.trim()) return;
-    actions.addGoal({
-      name: name.trim(),
-      description: desc.trim() || "—",
-      status: "in-progress",
-      habitIds: selected,
+    const data = {
+      name:        name.trim(),
+      description: desc.trim() || "",
+      kpi:         kpi.trim(),
+      status:      "in-progress",
       account,
-      weekPct: 0,
-      prevPct: 0,
-      target: "End of Q2",
-    });
+      habitIds:    selectedHabits,
+      taskIds:     selectedTasks,
+    };
+    if (isEdit) {
+      actions.updateGoal(goal.id, data);
+    } else {
+      actions.addGoal(data);
+    }
     onClose();
   };
+
+  const filteredTodos = state.todos.filter((t) =>
+    !t.done &&
+    (!taskSearch || t.name.toLowerCase().includes(taskSearch.toLowerCase()))
+  );
+
   return (
     <div className="modal-back" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>New goal</h3>
-        <div className="tiny">Define an outcome and link the habits that get you there.</div>
+      <div className="modal" style={{ maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+        <h3>{isEdit ? "Edit goal" : "New goal"}</h3>
+        <div className="tiny" style={{ marginBottom: 16, color: "var(--text-2)" }}>
+          {isEdit ? "Update your goal details, KPI, and linked habits or tasks." : "Define an outcome, set a KPI, and link what gets you there."}
+        </div>
+
         <div className="field">
           <label>Goal name</label>
-          <input className="input" placeholder="e.g. Lose 10 pounds" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+          <input className="input" placeholder="e.g. Lose 10 pounds" value={name}
+            onChange={(e) => setName(e.target.value)} autoFocus />
         </div>
+
         <div className="field">
-          <label>Description (optional)</label>
-          <textarea className="input" rows={2} value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Why does this matter right now?" />
+          <label>KPI <span style={{ fontWeight: 400, color: "var(--text-3)" }}>— how you'll measure success (optional)</span></label>
+          <input className="input" placeholder="e.g. Reach 185 lbs · Land 3 interviews · Hit $5k MRR"
+            value={kpi} onChange={(e) => setKpi(e.target.value)} />
         </div>
+
         <div className="field">
-          <label>Account</label>
-          <div style={{ display: "flex", gap: 6 }}>
+          <label>Description <span style={{ fontWeight: 400, color: "var(--text-3)" }}>(optional)</span></label>
+          <textarea className="input" rows={2} value={desc}
+            onChange={(e) => setDesc(e.target.value)} placeholder="Why does this matter right now?" />
+        </div>
+
+        <div className="field">
+          <label>Area</label>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {ACCOUNTS.map((a) => (
-              <button key={a.id}
-                className={"acc-chip" + (account === a.id ? " is-on" : "")}
+              <button key={a.id} className={"acc-chip" + (account === a.id ? " is-on" : "")}
                 onClick={() => setAccount(a.id)}>
                 <AccountDot acc={a.id} />
                 <span>{a.name}</span>
@@ -657,11 +716,12 @@ function AddGoalModal({ onClose, state, setState, actions }) {
             ))}
           </div>
         </div>
+
         <div className="field">
-          <label>Link habits</label>
+          <label>Link habits <span style={{ fontWeight: 400, color: "var(--text-3)" }}>— recurring weekly activities</span></label>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
             {state.habits.map((h) => {
-              const on = selected.includes(h.id);
+              const on = selectedHabits.includes(h.id);
               return (
                 <button key={h.id} className="pill"
                   style={{
@@ -669,40 +729,74 @@ function AddGoalModal({ onClose, state, setState, actions }) {
                     color: on ? "#fff" : "var(--text)",
                     borderColor: on ? "var(--text)" : "var(--border-soft)",
                   }}
-                  onClick={() => setSelected((s) => on ? s.filter((x) => x !== h.id) : [...s, h.id])}>
+                  onClick={() => toggleHabit(h.id)}>
                   {on && <Icon.Check />} {h.name}
                 </button>
               );
             })}
-            <button className="pill"
-              style={{ borderStyle: "dashed", color: "var(--text-2)" }}
+            <button className="pill" style={{ borderStyle: "dashed", color: "var(--text-2)" }}
               onClick={() => setShowNewHabit(true)}>
               <Icon.Plus /> New habit
             </button>
           </div>
           {showNewHabit && (
             <div className="fade-in" style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center" }}>
-              <input className="input" style={{ flex: 1 }}
-                placeholder="Habit name"
+              <input className="input" style={{ flex: 1 }} placeholder="Habit name"
                 value={newHabitName}
                 onChange={(e) => setNewHabitName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") createHabit(); if (e.key === "Escape") setShowNewHabit(false); }}
                 autoFocus />
-              <select className="btn" style={{ fontSize: 12 }}
-                value={newHabitTarget}
+              <select className="btn" style={{ fontSize: 12 }} value={newHabitTarget}
                 onChange={(e) => setNewHabitTarget(Number(e.target.value))}>
-                {[3,4,5,6,7].map((n) => (
-                  <option key={n} value={n}>{n}×/wk</option>
-                ))}
+                {[3,4,5,6,7].map((n) => <option key={n} value={n}>{n}×/wk</option>)}
               </select>
               <button className="btn btn-primary" onClick={createHabit} disabled={!newHabitName.trim()}>Add</button>
               <button className="btn-text" onClick={() => setShowNewHabit(false)}><Icon.X /></button>
             </div>
           )}
         </div>
+
+        <div className="field">
+          <label>Link tasks <span style={{ fontWeight: 400, color: "var(--text-3)" }}>— one-off actions that move this forward</span></label>
+          {state.todos.filter((t) => !t.done).length > 5 && (
+            <input className="input" style={{ marginBottom: 8, fontSize: 13 }}
+              placeholder="Search tasks…"
+              value={taskSearch}
+              onChange={(e) => setTaskSearch(e.target.value)} />
+          )}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {filteredTodos.length === 0 && (
+              <span className="tiny" style={{ color: "var(--text-3)" }}>
+                {taskSearch ? "No tasks match" : "No open tasks — add some in the To-Do list"}
+              </span>
+            )}
+            {filteredTodos.map((t) => {
+              const on = selectedTasks.includes(t.id);
+              return (
+                <button key={t.id} className="pill"
+                  style={{
+                    background: on ? "var(--text)" : "var(--surface-2)",
+                    color: on ? "#fff" : "var(--text)",
+                    borderColor: on ? "var(--text)" : "var(--border-soft)",
+                  }}
+                  onClick={() => toggleTask(t.id)}>
+                  {on && <Icon.Check />} {t.name}
+                </button>
+              );
+            })}
+          </div>
+          {selectedTasks.filter((id) => !filteredTodos.find((t) => t.id === id)).length > 0 && (
+            <div className="tiny" style={{ marginTop: 6, color: "var(--text-3)" }}>
+              + {selectedTasks.filter((id) => !filteredTodos.find((t) => t.id === id)).length} completed task(s) linked
+            </div>
+          )}
+        </div>
+
         <div className="actions">
           <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={save} disabled={!name.trim()}>Save goal</button>
+          <button className="btn btn-primary" onClick={save} disabled={!name.trim()}>
+            {isEdit ? "Save changes" : "Save goal"}
+          </button>
         </div>
       </div>
     </div>
