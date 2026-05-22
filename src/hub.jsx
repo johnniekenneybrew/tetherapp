@@ -8,7 +8,7 @@ import {
 // Habits + Health hub
 // ============================================================
 
-export function HabitsHub({ state, setState, sub, setSub }) {
+export function HabitsHub({ state, setState, sub, setSub, actions }) {
   const tabs = [
     { id: "habits", label: "Habits" },
     { id: "routines", label: "Routines" },
@@ -31,9 +31,9 @@ export function HabitsHub({ state, setState, sub, setSub }) {
         ))}
       </div>
 
-      {sub === "habits" && <HabitsTab state={state} setState={setState} />}
-      {sub === "routines" && <RoutinesTab state={state} setState={setState} />}
-      {sub === "goals" && <GoalsTab state={state} setState={setState} />}
+      {sub === "habits" && <HabitsTab state={state} setState={setState} actions={actions} />}
+      {sub === "routines" && <RoutinesTab state={state} setState={setState} actions={actions} />}
+      {sub === "goals" && <GoalsTab state={state} setState={setState} actions={actions} />}
       {sub === "wam" && <WamTab state={state} setState={setState} />}
     </div>
   );
@@ -41,7 +41,7 @@ export function HabitsHub({ state, setState, sub, setSub }) {
 
 // ----------- Habits tab -----------
 
-function HabitsTab({ state, setState }) {
+function HabitsTab({ state, setState, actions }) {
   const ws = weekStart(TODAY);
   const [weekOffset, setWeekOffset] = useState(0);
   const start = addDays(ws, weekOffset * 7);
@@ -55,12 +55,7 @@ function HabitsTab({ state, setState }) {
   );
 
   const toggleHabit = (date, hid) => {
-    const key = date.toISOString().slice(0, 10);
-    setState((s) => {
-      const log = { ...(s.habitLog[key] || {}) };
-      log[hid] = !log[hid];
-      return { ...s, habitLog: { ...s.habitLog, [key]: log } };
-    });
+    actions.toggleHabitLog(date, hid);
   };
 
   const dayLetters = ["M", "T", "W", "T", "F", "S", "S"];
@@ -164,14 +159,14 @@ function HabitsTab({ state, setState }) {
       <div style={{ marginTop: 16 }}>
         <button className="btn-link" onClick={() => setShowAddHabit(true)}><Icon.Plus /> Add habit</button>
       </div>
-      {showAddHabit && <AddHabitModal onClose={() => setShowAddHabit(false)} state={state} setState={setState} />}
+      {showAddHabit && <AddHabitModal onClose={() => setShowAddHabit(false)} state={state} setState={setState} actions={actions} />}
     </div>
   );
 }
 
 // ----------- Add Habit modal -----------
 
-function AddHabitModal({ onClose, state, setState }) {
+function AddHabitModal({ onClose, state, setState, actions }) {
   const [name, setName] = useState("");
   const [target, setTarget] = useState(5);
   const [account, setAccount] = useState("personal");
@@ -179,22 +174,12 @@ function AddHabitModal({ onClose, state, setState }) {
 
   const save = () => {
     if (!name.trim()) return;
-    const hid = "h-" + Date.now();
-    setState((s) => ({
-      ...s,
-      habits: [...s.habits, {
-        id: hid,
-        name: name.trim(),
-        target,
-        account,
-        goals: linkedGoals,
-      }],
-      goals: s.goals.map((g) =>
-        linkedGoals.includes(g.id)
-          ? { ...g, habitIds: [...g.habitIds, hid] }
-          : g
-      ),
-    }));
+    actions.addHabit({
+      name: name.trim(),
+      target,
+      account,
+      goals: linkedGoals,
+    });
     onClose();
   };
 
@@ -262,7 +247,7 @@ function AddHabitModal({ onClose, state, setState }) {
 
 // ----------- Routines tab -----------
 
-function RoutinesTab({ state, setState }) {
+function RoutinesTab({ state, setState, actions }) {
   const ws = weekStart(TODAY);
   const [weekOffset, setWeekOffset] = useState(0);
   const start = addDays(ws, weekOffset * 7);
@@ -272,19 +257,11 @@ function RoutinesTab({ state, setState }) {
   const [editingId, setEditingId] = useState(null);
 
   const toggleR = (date, rid) => {
-    const key = date.toISOString().slice(0, 10);
-    setState((s) => {
-      const log = { ...(s.routineLog[key] || {}) };
-      log[rid] = !log[rid];
-      return { ...s, routineLog: { ...s.routineLog, [key]: log } };
-    });
+    actions.toggleRoutineLog(date, rid);
   };
 
   const updateRoutine = (rid, patch) => {
-    setState((s) => ({
-      ...s,
-      routines: s.routines.map((r) => r.id === rid ? { ...r, ...patch } : r),
-    }));
+    actions.updateRoutine(rid, patch);
   };
 
   return (
@@ -455,7 +432,7 @@ function RoutineEditor({ routine, onSave, onClose }) {
 
 // ----------- Goals tab -----------
 
-function GoalsTab({ state, setState }) {
+function GoalsTab({ state, setState, actions }) {
   const [menuOpen, setMenuOpen] = useState(null);
   const [showCompleted, setShowCompleted] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
@@ -468,11 +445,11 @@ function GoalsTab({ state, setState }) {
   const habitsById = Object.fromEntries(state.habits.map((h) => [h.id, h]));
 
   const completeGoal = (id) => {
-    setState((s) => ({ ...s, goals: s.goals.map((g) => g.id === id ? { ...g, status: "completed" } : g) }));
+    actions.updateGoal(id, { status: "completed" });
     setMenuOpen(null);
   };
   const delGoal = (id) => {
-    setState((s) => ({ ...s, goals: s.goals.filter((g) => g.id !== id) }));
+    actions.deleteGoal(id);
     setMenuOpen(null);
   };
 
@@ -572,7 +549,7 @@ function GoalsTab({ state, setState }) {
         )}
       </div>
 
-      {showAdd && <AddGoalModal onClose={() => setShowAdd(false)} state={state} setState={setState} />}
+      {showAdd && <AddGoalModal onClose={() => setShowAdd(false)} state={state} setState={setState} actions={actions} />}
     </div>
   );
 }
@@ -593,7 +570,7 @@ function MenuItem({ children, onClick, destructive }) {
   );
 }
 
-function AddGoalModal({ onClose, state, setState }) {
+function AddGoalModal({ onClose, state, setState, actions }) {
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [selected, setSelected] = useState([]);
@@ -605,16 +582,7 @@ function AddGoalModal({ onClose, state, setState }) {
   const createHabit = () => {
     if (!newHabitName.trim()) return;
     const hid = "h-" + Date.now();
-    setState((s) => ({
-      ...s,
-      habits: [...s.habits, {
-        id: hid,
-        name: newHabitName.trim(),
-        target: newHabitTarget,
-        account: "personal",
-        goals: [],
-      }],
-    }));
+    actions.addHabit({ id: hid, name: newHabitName.trim(), target: newHabitTarget, account: "personal", goals: [] });
     setSelected((s) => [...s, hid]);
     setNewHabitName("");
     setShowNewHabit(false);
@@ -622,24 +590,16 @@ function AddGoalModal({ onClose, state, setState }) {
 
   const save = () => {
     if (!name.trim()) return;
-    const goalId = "g-" + Date.now();
-    setState((s) => ({
-      ...s,
-      goals: [...s.goals, {
-        id: goalId,
-        name: name.trim(),
-        description: desc.trim() || "—",
-        status: "in-progress",
-        habitIds: selected,
-        account,
-        weekPct: 0,
-        prevPct: 0,
-        target: "End of Q2",
-      }],
-      habits: s.habits.map((h) =>
-        selected.includes(h.id) ? { ...h, goals: [...(h.goals || []), goalId] } : h
-      ),
-    }));
+    actions.addGoal({
+      name: name.trim(),
+      description: desc.trim() || "—",
+      status: "in-progress",
+      habitIds: selected,
+      account,
+      weekPct: 0,
+      prevPct: 0,
+      target: "End of Q2",
+    });
     onClose();
   };
   return (

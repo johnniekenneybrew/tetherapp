@@ -8,7 +8,7 @@ import {
 // To-Do List
 // ============================================================
 
-export function TodoList({ state, setState }) {
+export function TodoList({ state, setState, actions }) {
   const [filter, setFilter] = useState("all");
   const [showWeek, setShowWeek] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -32,21 +32,12 @@ export function TodoList({ state, setState }) {
     const bOver = b.due != null && b.due < 0;
     if (aOver !== bOver) return aOver ? -1 : 1;
     if (!!a.priority !== !!b.priority) return a.priority ? -1 : 1;
-    return a.id - b.id;
+    return 0;
   });
 
-  const update = (id, patch) => {
-    setState((s) => ({ ...s, todos: s.todos.map((t) => (t.id === id ? { ...t, ...patch } : t)) }));
-  };
-  const toggleDone = (id) => {
-    setState((s) => ({
-      ...s,
-      todos: s.todos.map((t) =>
-        t.id === id ? { ...t, done: !t.done, completedDay: !t.done ? "today" : null } : t
-      ),
-    }));
-  };
-  const delTodo = (id) => setState((s) => ({ ...s, todos: s.todos.filter((t) => t.id !== id) }));
+  const update = (id, patch) => actions.updateTodo(id, patch);
+  const toggleDone = (id) => actions.toggleDone(id);
+  const delTodo = (id) => actions.deleteTodo(id);
   const addTodo = () => {
     if (!newTitle.trim()) return;
     const next = {
@@ -59,30 +50,11 @@ export function TodoList({ state, setState }) {
       due: null,
       subtasks: [],
     };
-    setState((s) => ({ ...s, todos: [next, ...s.todos] }));
+    actions.addTodo(next);
     setNewTitle(""); setNewDetails(""); setNewOpen(false);
   };
-  const addSubtask = (id, text) => {
-    if (!text.trim()) return;
-    setState((s) => ({
-      ...s,
-      todos: s.todos.map((t) =>
-        t.id === id
-          ? { ...t, subtasks: [...t.subtasks, { id: Date.now(), text: text.trim(), done: false }] }
-          : t
-      ),
-    }));
-  };
-  const toggleSub = (todoId, subId) => {
-    setState((s) => ({
-      ...s,
-      todos: s.todos.map((t) =>
-        t.id === todoId
-          ? { ...t, subtasks: t.subtasks.map((st) => (st.id === subId ? { ...st, done: !st.done } : st)) }
-          : t
-      ),
-    }));
-  };
+  const addSubtask = (id, text) => actions.addSubtask(id, text);
+  const toggleSub = (todoId, subId) => actions.toggleSubtask(todoId, subId);
 
   return (
     <div className="page page--narrow fade-in">

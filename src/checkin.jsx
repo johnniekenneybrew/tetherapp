@@ -8,7 +8,7 @@ import {
 // Daily Check-In (desktop two-column)
 // ============================================================
 
-export function DailyCheckIn({ state, setState, navigateTo }) {
+export function DailyCheckIn({ state, setState, navigateTo, actions }) {
   const today = TODAY;
   const yest = addDays(today, -1);
   const habits = state.habits;
@@ -59,6 +59,7 @@ export function DailyCheckIn({ state, setState, navigateTo }) {
     setCelebrating(false);
     setShowBanner(true);
     setState((s) => ({ ...s, checkin: { ...s.checkin, priorities, gratitude, learnings, sectionsDone, completed: true } }));
+    actions.updateCheckin({ completed: true, gratitude, learnings, sectionsDone });
     setTimeout(() => navigateTo({ page: "todo" }), 900);
   };
 
@@ -80,22 +81,19 @@ export function DailyCheckIn({ state, setState, navigateTo }) {
   };
 
   const toggleYHabit = (habitId) => {
-    setState((s) => {
-      const log = { ...(s.habitLog[yKey] || {}) };
-      log[habitId] = !log[habitId];
-      return { ...s, habitLog: { ...s.habitLog, [yKey]: log } };
-    });
+    actions.toggleHabitLog(yKey, habitId);
   };
   const toggleYRoutine = (rid) => {
-    setState((s) => {
-      const log = { ...(s.routineLog[yKey] || {}) };
-      log[rid] = !log[rid];
-      return { ...s, routineLog: { ...s.routineLog, [yKey]: log } };
-    });
+    actions.toggleRoutineLog(yKey, rid);
   };
 
-  const setSectionDone = (key, val) =>
-    setSectionsDone((s) => ({ ...s, [key]: val }));
+  const setSectionDone = (key, val) => {
+    setSectionsDone((s) => {
+      const next = { ...s, [key]: val };
+      actions.updateCheckin({ sectionsDone: next });
+      return next;
+    });
+  };
 
   return (
     <div className="page fade-in" style={{ maxWidth: 960 }}>
@@ -272,6 +270,11 @@ export function DailyCheckIn({ state, setState, navigateTo }) {
                       next[i] = e.target.value;
                       setGratitude(next);
                     }}
+                    onBlur={(e) => {
+                      const next = [...gratitude];
+                      next[i] = e.target.value;
+                      actions.updateCheckin({ gratitude: next });
+                    }}
                     rows={2}
                     style={{ minHeight: 64 }}
                   />
@@ -302,6 +305,11 @@ export function DailyCheckIn({ state, setState, navigateTo }) {
                       const next = [...learnings];
                       next[i] = e.target.value;
                       setLearnings(next);
+                    }}
+                    onBlur={(e) => {
+                      const next = [...learnings];
+                      next[i] = e.target.value;
+                      actions.updateCheckin({ learnings: next });
                     }}
                     rows={2}
                     style={{ minHeight: 64 }}

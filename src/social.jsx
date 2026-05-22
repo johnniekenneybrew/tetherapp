@@ -26,7 +26,7 @@ const daysUntilBirthday = (bday) => {
   return Math.round((next - TODAY) / (1000 * 60 * 60 * 24));
 };
 
-export function SocialPage({ state, setState }) {
+export function SocialPage({ state, setState, actions }) {
   const [groupFilter, setGroupFilter] = useState("all");
   const [tagFilter, setTagFilter] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
@@ -55,43 +55,15 @@ export function SocialPage({ state, setState }) {
 
   const groupById = Object.fromEntries(groups.map((g) => [g.id, g]));
 
-  const updateContact = (id, patch) => {
-    setState((s) => ({
-      ...s,
-      contacts: s.contacts.map((c) => c.id === id ? { ...c, ...patch } : c),
-    }));
-  };
+  const updateContact = (id, patch) => actions.updateContact(id, patch);
 
   const deleteContact = (id) => {
-    setState((s) => ({ ...s, contacts: s.contacts.filter((c) => c.id !== id) }));
+    actions.deleteContact(id);
     setExpandedId(null);
   };
 
-  const addNote = (contactId, text) => {
-    if (!text.trim()) return;
-    const note = {
-      id: "n-" + Date.now(),
-      text: text.trim(),
-      timestamp: new Date().toISOString(),
-    };
-    setState((s) => ({
-      ...s,
-      contacts: s.contacts.map((c) =>
-        c.id === contactId ? { ...c, notes: [note, ...(c.notes || [])] } : c
-      ),
-    }));
-  };
-
-  const deleteNote = (contactId, noteId) => {
-    setState((s) => ({
-      ...s,
-      contacts: s.contacts.map((c) =>
-        c.id === contactId
-          ? { ...c, notes: (c.notes || []).filter((n) => n.id !== noteId) }
-          : c
-      ),
-    }));
-  };
+  const addNote = (contactId, text) => actions.addNote(contactId, text);
+  const deleteNote = (contactId, noteId) => actions.deleteNote(contactId, noteId);
 
   return (
     <div className="page fade-in">
@@ -261,7 +233,7 @@ export function SocialPage({ state, setState }) {
           groups={groups}
           onClose={() => setShowAddContact(false)}
           onSave={(contact) => {
-            setState((s) => ({ ...s, contacts: [...s.contacts, contact] }));
+            actions.addContact(contact);
             setShowAddContact(false);
           }}
         />
@@ -272,7 +244,7 @@ export function SocialPage({ state, setState }) {
           groups={groups}
           onClose={() => setShowManageGroups(false)}
           onSave={(newGroups) => {
-            setState((s) => ({ ...s, contactGroups: newGroups }));
+            actions.saveContactGroups(newGroups);
             setShowManageGroups(false);
           }}
         />
