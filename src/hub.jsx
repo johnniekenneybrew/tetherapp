@@ -454,7 +454,7 @@ function GoalsTab({ state, setState, actions }) {
   };
 
   return (
-    <div onClick={() => setMenuOpen(null)}>
+    <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
         <div className="row" style={{ gap: 10 }}>
           <span className="tiny">Active goals · {active.length}</span>
@@ -487,8 +487,10 @@ function GoalsTab({ state, setState, actions }) {
               {g.target && <div className="goal-target">Target {g.target} · {g.description}</div>}
             </div>
             <StatusBadge status={g.status} />
-            <div style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
-              <button className="kebab" onClick={() => setMenuOpen(menuOpen === g.id ? null : g.id)}>
+            <div style={{ position: "relative" }}
+              onMouseEnter={() => setMenuOpen(g.id)}
+              onMouseLeave={() => setMenuOpen(null)}>
+              <button className="kebab">
                 <Icon.Kebab />
               </button>
               {menuOpen === g.id && (

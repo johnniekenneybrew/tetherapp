@@ -156,17 +156,9 @@ export function TopBar({ route, setRoute, dateLabel, onHubTab }) {
 
   useEffect(() => {
     if (!menuOpen && !dropOpen) return;
-    const onDown = (e) => {
-      if (!e.target.closest("[data-avatar-menu]")) setMenuOpen(false);
-      if (!e.target.closest("[data-nav-drop]")) setDropOpen(null);
-    };
     const onKey = (e) => { if (e.key === "Escape") { setMenuOpen(false); setDropOpen(null); } };
-    document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
+    return () => document.removeEventListener("keydown", onKey);
   }, [menuOpen, dropOpen]);
 
   return (
@@ -195,17 +187,12 @@ export function TopBar({ route, setRoute, dateLabel, onHubTab }) {
 
             if (isDropdown) {
               return (
-                <div key={it.id} data-nav-drop style={{ position: "relative" }}>
+                <div key={it.id} data-nav-drop style={{ position: "relative" }}
+                  onMouseEnter={() => setDropOpen(it.id)}
+                  onMouseLeave={() => setDropOpen(null)}>
                   <button
                     className={route.page === it.id ? "active" : ""}
-                    onClick={() => {
-                      if (route.page === it.id) {
-                        setDropOpen(isOpen ? null : it.id);
-                      } else {
-                        setRoute({ page: it.id });
-                        setDropOpen(it.id);
-                      }
-                    }}>
+                    onClick={() => setRoute({ page: it.id })}>
                     {it.label}
                     <Icon.Chevron style={{ marginLeft: 2, opacity: 0.5 }} />
                   </button>
@@ -219,7 +206,6 @@ export function TopBar({ route, setRoute, dateLabel, onHubTab }) {
                             onClick={() => {
                               setRoute({ page: it.id });
                               if (it.id === "hub" && onHubTab?.set) onHubTab.set(tab.id);
-                              setDropOpen(null);
                             }}>
                             {tab.label}
                           </button>
@@ -251,10 +237,11 @@ export function TopBar({ route, setRoute, dateLabel, onHubTab }) {
           </nav>
           <span className="nav-divider" />
           <span className="hint"><Icon.Sun /> Thu · {dateLabel}</span>
-          <div data-avatar-menu style={{ position: "relative" }}>
+          <div data-avatar-menu style={{ position: "relative" }}
+            onMouseEnter={() => setMenuOpen(true)}
+            onMouseLeave={() => setMenuOpen(false)}>
             <button
               className={"avatar" + (route.page === "settings" ? " is-active" : "")}
-              onClick={() => setMenuOpen((s) => !s)}
               aria-expanded={menuOpen}
               title="Account">
               JM
