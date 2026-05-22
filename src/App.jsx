@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SignIn, SignedIn, SignedOut } from '@clerk/clerk-react';
 import { ACCOUNTS, TODAY, fmtShort, TopBar } from './shared';
 import { DailyCheckIn } from './checkin';
@@ -11,6 +11,8 @@ import { useAppData } from './useAppData';
 // App
 // ============================================================
 
+const DEFAULT_AREA_COLORS = { getro: "#3B82F6", jones: "#8B5CF6", personal: "#64748B" };
+
 function AuthedApp() {
   const { state, setState, loading, error, actions } = useAppData();
   const [route, setRoute] = useState({ page: "checkin" });
@@ -18,6 +20,15 @@ function AuthedApp() {
 
   const dateLabel = fmtShort(TODAY).split(", ")[1];
   const navigateTo = (r) => setRoute(r);
+
+  // Sync area colors to CSS variables so dots/badges update live
+  useEffect(() => {
+    const areas = state.accounts || ACCOUNTS.map((a) => ({ ...a, color: DEFAULT_AREA_COLORS[a.id] }));
+    const root = document.documentElement;
+    areas.forEach((a) => {
+      if (a.color) root.style.setProperty(`--acc-${a.id}`, a.color);
+    });
+  }, [state.accounts]);
 
   if (loading) {
     return (

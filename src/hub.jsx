@@ -902,163 +902,190 @@ function WamTab({ state }) {
 
 // ----------- Settings tab -----------
 
+const DEFAULT_AREA_COLORS = { getro: "#3B82F6", jones: "#8B5CF6", personal: "#64748B" };
+const AREA_PALETTE = ["#3B82F6", "#8B5CF6", "#64748B", "#10B981", "#F59E0B", "#EF4444", "#EC4899", "#06B6D4", "#6C63FF", "#1A1A1A"];
+
+const NOTION_DBS = [
+  { name: "Daily Check-Ins", id: "e0e02d06" },
+  { name: "Tasks",           id: "751eca9e" },
+  { name: "Goals",           id: "2414b2e0" },
+  { name: "Habits",          id: "0a274c5f" },
+  { name: "Habit Log",       id: "4dabaabd" },
+  { name: "Routines",        id: "df0a549e" },
+  { name: "Routine Log",     id: "b6bae775" },
+  { name: "Contacts",        id: "e8023bd0" },
+  { name: "Contact Groups",  id: "e5fc6aaf" },
+  { name: "Contact Notes",   id: "c02a9437" },
+];
+
 export function SettingsTab({ state, setState }) {
-  const [notifs, setNotifs] = useState({ checkin: true, habits: false });
-  const [editingAcc, setEditingAcc] = useState(null);
-
-  const COLORS = ["#3B82F6", "#8B5CF6", "#64748B", "#10B981", "#F59E0B", "#EF4444", "#EC4899", "#06B6D4", "#1A1A1A"];
-
-  const accounts = state.accounts || ACCOUNTS.map((a) => ({
+  const areas = state.accounts || ACCOUNTS.map((a) => ({
     ...a,
-    color: a.id === "getro" ? "#3B82F6" : a.id === "jones" ? "#8B5CF6" : "#64748B",
-    emails: a.emails || [a.email || ""],
+    color: DEFAULT_AREA_COLORS[a.id] || "#64748B",
   }));
 
-  const updateAccount = (id, patch) => {
+  const updateArea = (id, patch) => {
     setState((s) => ({
       ...s,
-      accounts: (s.accounts || accounts).map((a) => a.id === id ? { ...a, ...patch } : a),
-    }));
-  };
-
-  const addEmail = (accId) => {
-    setState((s) => ({
-      ...s,
-      accounts: (s.accounts || accounts).map((a) =>
-        a.id === accId ? { ...a, emails: [...(a.emails || []), ""] } : a
-      ),
-    }));
-  };
-
-  const updateEmail = (accId, idx, val) => {
-    setState((s) => ({
-      ...s,
-      accounts: (s.accounts || accounts).map((a) => {
-        if (a.id !== accId) return a;
-        const emails = [...(a.emails || [])];
-        emails[idx] = val;
-        return { ...a, emails };
-      }),
-    }));
-  };
-
-  const removeEmail = (accId, idx) => {
-    setState((s) => ({
-      ...s,
-      accounts: (s.accounts || accounts).map((a) => {
-        if (a.id !== accId) return a;
-        const emails = (a.emails || []).filter((_, i) => i !== idx);
-        return { ...a, emails: emails.length ? emails : [""] };
-      }),
+      accounts: (s.accounts || areas).map((a) => a.id === id ? { ...a, ...patch } : a),
     }));
   };
 
   return (
-    <div>
-      <h3 className="section-title">Connected accounts</h3>
-      {accounts.map((a) => {
-        const isEditing = editingAcc === a.id;
-        return (
-          <div key={a.id} className="card" style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <span style={{
-              width: 32, height: 32, borderRadius: 8,
-              background: a.color || "#64748B",
-              color: "#fff", display: "grid", placeItems: "center", fontWeight: 700, fontSize: 13,
-              flexShrink: 0,
-            }}>{a.short}</span>
-            <div style={{ flex: 1 }}>
-              {isEditing ? (
-                <div className="fade-in" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <input className="input" style={{ fontSize: 14, padding: "6px 10px" }}
-                    value={a.name} autoFocus
-                    onChange={(e) => updateAccount(a.id, { name: e.target.value })} />
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <span className="tiny">Connected emails</span>
-                    {(a.emails || []).map((em, i) => (
-                      <div key={i} style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                        <input className="input" style={{ flex: 1, fontSize: 13, padding: "5px 10px" }}
-                          value={em} placeholder="email@example.com"
-                          onChange={(e) => updateEmail(a.id, i, e.target.value)} />
-                        {(a.emails || []).length > 1 && (
-                          <button className="btn-text" style={{ color: "var(--error)", padding: 4 }}
-                            onClick={() => removeEmail(a.id, i)}>
-                            <Icon.X />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                    <button className="btn-text" style={{ alignSelf: "flex-start", fontSize: 12 }}
-                      onClick={() => addEmail(a.id)}>
-                      <Icon.Plus /> Add email
-                    </button>
-                  </div>
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <span className="tiny">Color</span>
-                    {COLORS.map((c) => (
-                      <button key={c}
-                        onClick={() => updateAccount(a.id, { color: c })}
-                        style={{
-                          width: 20, height: 20, borderRadius: 5,
-                          background: c, border: a.color === c ? "2px solid var(--text)" : "2px solid transparent",
-                          cursor: "pointer", transition: "border-color 100ms",
-                        }} />
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{a.name}</div>
-                  <div className="tiny">
-                    {(a.emails || []).join(", ")} · last synced 2 min ago
-                  </div>
-                </>
-              )}
-            </div>
-            <span className="badge badge--green"><Icon.Check /> Synced</span>
-            <button className="btn-text" onClick={() => setEditingAcc(isEditing ? null : a.id)}>
-              {isEditing ? "Done" : "Edit"}
-            </button>
-            <button className="btn-text">Re-sync</button>
-            <button className="btn-text" style={{ color: "var(--error)" }}>Disconnect</button>
-          </div>
-        );
-      })}
-
-      <h3 className="section-title" style={{ marginTop: 28 }}>Integrations</h3>
-      <div className="card">
-        <div className="setting-row">
-          <div>
-            <div className="sr-label">Google Tasks</div>
-            <div className="sr-sub">3 lists synced · last 4 min ago</div>
-          </div>
-          <button className="btn-text">Manage</button>
-        </div>
-        <div className="setting-row">
-          <div>
-            <div className="sr-label">Notion</div>
-            <div className="sr-sub">2 databases synced · last 8 min ago</div>
-          </div>
-          <button className="btn-text">Manage</button>
-        </div>
+    <div style={{ maxWidth: 640 }}>
+      {/* Areas */}
+      <h3 className="section-title">Areas</h3>
+      <p className="tiny" style={{ marginBottom: 14, color: "var(--text-3)" }}>
+        Areas group your habits, tasks, and goals. Colors sync across the whole app.
+      </p>
+      <div className="card" style={{ padding: "6px 0" }}>
+        {areas.map((a, i) => (
+          <AreaRow key={a.id} area={a} onUpdate={(patch) => updateArea(a.id, patch)}
+            showDivider={i < areas.length - 1} />
+        ))}
       </div>
 
-      <h3 className="section-title" style={{ marginTop: 28 }}>Notifications</h3>
-      <div className="card">
-        <div className="setting-row">
-          <div>
-            <div className="sr-label">Daily Check-In reminder</div>
-            <div className="sr-sub">Every morning at 8:00 AM</div>
+      {/* Integrations */}
+      <h3 className="section-title" style={{ marginTop: 32 }}>Integrations</h3>
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+
+        {/* Notion */}
+        <div style={{ padding: "16px 20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+            <NotionIcon />
+            <span style={{ fontWeight: 600, fontSize: 14 }}>Notion</span>
+            <span className="badge badge--green" style={{ marginLeft: "auto" }}>
+              <Icon.Check /> Sync active
+            </span>
           </div>
-          <div className={"switch" + (notifs.checkin ? " on" : "")} onClick={() => setNotifs((n) => ({ ...n, checkin: !n.checkin }))} />
+          <p className="tiny" style={{ marginBottom: 12, color: "var(--text-2)" }}>
+            Bidirectional sync is live. All reads and writes go directly to your Notion workspace in real time — no cache, no delay.
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
+            {NOTION_DBS.map((db) => (
+              <span key={db.id} style={{
+                fontSize: 11.5, padding: "2px 8px", borderRadius: 4,
+                background: "var(--surface-2)", color: "var(--text-2)", border: "1px solid var(--border-soft)",
+              }}>{db.name}</span>
+            ))}
+          </div>
+          <a
+            href="https://www.notion.so"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ fontSize: 12, color: "var(--text-3)", textDecoration: "none", borderBottom: "1px solid var(--border)" }}>
+            Open Notion workspace ↗
+          </a>
         </div>
-        <div className="setting-row">
-          <div>
-            <div className="sr-label">Habit check-in reminder</div>
-            <div className="sr-sub">Every evening at 9:00 PM</div>
+
+        <div style={{ height: 1, background: "var(--border-soft)" }} />
+
+        {/* Google Tasks */}
+        <div style={{ padding: "16px 20px", opacity: 0.6 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <GoogleTasksIcon />
+            <span style={{ fontWeight: 600, fontSize: 14 }}>Google Tasks</span>
+            <span className="badge badge--grey" style={{ marginLeft: "auto" }}>Coming soon</span>
           </div>
-          <div className={"switch" + (notifs.habits ? " on" : "")} onClick={() => setNotifs((n) => ({ ...n, habits: !n.habits }))} />
+          <p className="tiny" style={{ marginTop: 8, color: "var(--text-3)" }}>
+            Sync your Google Tasks lists directly into the To-Do view.
+          </p>
         </div>
       </div>
     </div>
+  );
+}
+
+function AreaRow({ area, onUpdate, showDivider }) {
+  const [editingColor, setEditingColor] = useState(false);
+  const [name, setName] = useState(area.name);
+  const ref = useRef(null);
+
+  useEffect(() => { setName(area.name); }, [area.name]);
+
+  useEffect(() => {
+    if (!editingColor) return;
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setEditingColor(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [editingColor]);
+
+  const saveName = () => {
+    if (name.trim() && name.trim() !== area.name) onUpdate({ name: name.trim() });
+  };
+
+  return (
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 18px" }}>
+        {/* Color swatch */}
+        <div style={{ position: "relative" }} ref={ref}>
+          <button
+            onClick={() => setEditingColor((v) => !v)}
+            style={{
+              width: 28, height: 28, borderRadius: 7,
+              background: area.color || "#64748B",
+              border: "none", cursor: "pointer", flexShrink: 0,
+              boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+              transition: "transform 100ms",
+            }}
+            title="Change color"
+          />
+          {editingColor && (
+            <div style={{
+              position: "absolute", top: "calc(100% + 6px)", left: 0,
+              background: "var(--surface)", border: "1.5px solid var(--border)",
+              borderRadius: 10, padding: 10, zIndex: 300,
+              display: "flex", flexWrap: "wrap", gap: 6, width: 152,
+              boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
+            }}>
+              {AREA_PALETTE.map((c) => (
+                <button key={c}
+                  onClick={() => { onUpdate({ color: c }); setEditingColor(false); }}
+                  style={{
+                    width: 22, height: 22, borderRadius: 5, background: c,
+                    border: area.color === c ? "2.5px solid var(--text)" : "2px solid transparent",
+                    cursor: "pointer",
+                  }} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Editable name */}
+        <input
+          className="input"
+          style={{ flex: 1, fontSize: 13.5, fontWeight: 500, padding: "5px 8px", background: "transparent", border: "1px solid transparent" }}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={saveName}
+          onKeyDown={(e) => { if (e.key === "Enter") { saveName(); e.target.blur(); } }}
+          onFocus={(e) => (e.target.style.borderColor = "var(--border)")}
+        />
+
+        {/* Live dot preview */}
+        <span style={{
+          width: 8, height: 8, borderRadius: "50%",
+          background: area.color || "#64748B", flexShrink: 0,
+        }} />
+      </div>
+      {showDivider && <div style={{ height: 1, background: "var(--border-soft)", margin: "0 18px" }} />}
+    </>
+  );
+}
+
+function NotionIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L17.86 1.968c-.42-.326-.981-.7-2.055-.607L3.01 2.295c-.466.046-.56.28-.374.466zm.793 3.08v13.904c0 .747.373 1.027 1.214.98l14.523-.84c.841-.046.935-.56.935-1.167V6.354c0-.606-.233-.933-.748-.887l-15.177.887c-.56.047-.747.327-.747.933zm14.337.745c.093.42 0 .84-.42.888l-.7.14v10.264c-.608.327-1.168.514-1.635.514-.748 0-.935-.234-1.495-.933l-4.577-7.186v6.952L12.21 19s0 .84-1.168.84l-3.222.186c-.093-.186 0-.653.327-.746l.84-.233V9.854L7.822 9.76c-.094-.42.14-1.026.793-1.073l3.456-.233 4.764 7.279v-6.44l-1.215-.14c-.093-.514.28-.887.747-.933z"/>
+    </svg>
+  );
+}
+
+function GoogleTasksIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" opacity="0.4"/>
+      <path d="M8 12l3 3 5-5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" opacity="0.4"/>
+    </svg>
   );
 }
