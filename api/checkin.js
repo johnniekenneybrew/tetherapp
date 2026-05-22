@@ -1,42 +1,39 @@
 import { notion, DB, P, p, queryAll, setCors } from "./_notion.js";
 
-// ============================================================
-// Map Notion page -> app checkin object
-// ============================================================
+const TODAY_ISO = "2026-05-22";
+
 function toCheckin(page) {
   const props = page.properties;
   return {
     _pageId: page.id,
-    date: p.date(props.Date),
-    gratitude: (() => {
-      try { return JSON.parse(p.rich(props.Gratitude) || '["","",""]'); } catch { return ["", "", ""]; }
-    })(),
-    learnings: (() => {
-      try { return JSON.parse(p.rich(props.Learnings) || '["","",""]'); } catch { return ["", "", ""]; }
-    })(),
-    sectionsDone: (() => {
-      try { return JSON.parse(p.rich(props.SectionsDone) || "{}"); } catch { return {}; }
-    })(),
+    date: p.date(props["Check-In Date"]),
+    gratitude: [
+      p.rich(props["Gratitude 1"]) || "",
+      p.rich(props["Gratitude 2"]) || "",
+      p.rich(props["Gratitude 3"]) || "",
+    ],
+    learnings: [
+      p.rich(props["Learning 1"]) || "",
+      p.rich(props["Learning 2"]) || "",
+      p.rich(props["Learning 3"]) || "",
+    ],
     completed: p.checkbox(props.Completed),
-    habitsUpdatedConfirmed: p.checkbox(props.HabitsUpdatedConfirmed),
+    sectionsDone: {},
+    habitsUpdatedConfirmed: false,
   };
 }
 
-// ============================================================
-// Handler
-// ============================================================
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === "OPTIONS") return res.status(200).end();
 
   try {
-    // GET — find-or-create by date
     if (req.method === "GET") {
-      const date = req.query.date; // YYYY-MM-DD
+      const date = req.query.date;
       if (!date) return res.status(400).json({ error: "date required" });
 
       const pages = await queryAll(DB.CHECKINS, {
-        property: "Date",
+        property: "Check-In Date",
         date: { equals: date },
       });
 
@@ -44,33 +41,39 @@ export default async function handler(req, res) {
         return res.json(toCheckin(pages[0]));
       }
 
-      // Create a fresh checkin for this date
       const page = await notion.pages.create({
         parent: { database_id: DB.CHECKINS },
         properties: {
-          Name:                   P.title(date),
-          Date:                   P.date(date),
-          Gratitude:              P.rich('["","",""]'),
-          Learnings:              P.rich('["","",""]'),
-          SectionsDone:           P.rich("{}"),
-          Completed:              P.checkbox(false),
-          HabitsUpdatedConfirmed: P.checkbox(false),
+          Date:            P.title(date),
+          "Check-In Date": P.date(date),
+          "Gratitude 1":   P.rich(""),
+          "Gratitude 2":   P.rich(""),
+          "Gratitude 3":   P.rich(""),
+          "Learning 1":    P.rich(""),
+          "Learning 2":    P.rich(""),
+          "Learning 3":    P.rich(""),
+          Completed:       P.checkbox(false),
         },
       });
       return res.json(toCheckin(page));
     }
 
-    // PATCH — update checkin fields
     if (req.method === "PATCH") {
       const { id, ...patch } = req.body;
       if (!id) return res.status(400).json({ error: "id required" });
 
       const updates = {};
-      if (patch.gratitude  !== undefined) updates.Gratitude              = P.rich(JSON.stringify(patch.gratitude));
-      if (patch.learnings  !== undefined) updates.Learnings              = P.rich(JSON.stringify(patch.learnings));
-      if (patch.sectionsDone !== undefined) updates.SectionsDone         = P.rich(JSON.stringify(patch.sectionsDone));
-      if (patch.completed  !== undefined) updates.Completed              = P.checkbox(patch.completed);
-      if (patch.habitsUpdatedConfirmed !== undefined) updates.HabitsUpdatedConfirmed = P.checkbox(patch.habitsUpdatedConfirmed);
+      if (patch.gratitude !== undefined) {
+        updates["Gratitude 1"] = P.rich(patch.gratitude[0] || "");
+        updates["Gratitude 2"] = P.rich(patch.gratitude[1] || "");
+        updates["Gratitude 3"] = P.rich(patch.gratitude[2] || "");
+      }
+      if (patch.learnings !== undefined) {
+        updates["Learning 1"] = P.rich(patch.learnings[0] || "");
+        updates["Learning 2"] = P.rich(patch.learnings[1] || "");
+        updates["Learning 3"] = P.rich(patch.learnings[2] || "");
+      }
+      if (patch.completed !== undefined) updates.Completed = P.checkbox(patch.completed);
 
       const page = await notion.pages.update({ page_id: id, properties: updates });
       return res.json(toCheckin(page));

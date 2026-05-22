@@ -7,8 +7,9 @@ function toRoutine(page) {
     id: page.id,
     name: p.title(props.Name),
     icon: p.rich(props.Icon) || "✨",
-    useIcon: p.checkbox(props.UseIcon),
-    trackOnly: p.checkbox(props.TrackOnly),
+    useIcon: p.checkbox(props["Use Icon"]),
+    trackOnly: p.checkbox(props["Track Only"]),
+    active: p.checkbox(props.Active),
   };
 }
 
@@ -27,10 +28,11 @@ export default async function handler(req, res) {
       const page = await notion.pages.create({
         parent: { database_id: DB.ROUTINES },
         properties: {
-          Name:      P.title(name),
-          Icon:      P.rich(icon || "✨"),
-          UseIcon:   P.checkbox(useIcon ?? true),
-          TrackOnly: P.checkbox(trackOnly ?? false),
+          Name:         P.title(name),
+          Icon:         P.rich(icon || "✨"),
+          "Use Icon":   P.checkbox(useIcon ?? true),
+          "Track Only": P.checkbox(trackOnly ?? false),
+          Active:       P.checkbox(true),
         },
       });
       return res.json(toRoutine(page));
@@ -41,10 +43,11 @@ export default async function handler(req, res) {
       if (!id) return res.status(400).json({ error: "id required" });
 
       const updates = {};
-      if (patch.name      !== undefined) updates.Name      = P.title(patch.name);
-      if (patch.icon      !== undefined) updates.Icon      = P.rich(patch.icon || "");
-      if (patch.useIcon   !== undefined) updates.UseIcon   = P.checkbox(patch.useIcon);
-      if (patch.trackOnly !== undefined) updates.TrackOnly = P.checkbox(patch.trackOnly);
+      if (patch.name      !== undefined) updates.Name           = P.title(patch.name);
+      if (patch.icon      !== undefined) updates.Icon           = P.rich(patch.icon || "");
+      if (patch.useIcon   !== undefined) updates["Use Icon"]    = P.checkbox(patch.useIcon);
+      if (patch.trackOnly !== undefined) updates["Track Only"]  = P.checkbox(patch.trackOnly);
+      if (patch.active    !== undefined) updates.Active         = P.checkbox(patch.active);
 
       const page = await notion.pages.update({ page_id: id, properties: updates });
       return res.json(toRoutine(page));

@@ -1,12 +1,12 @@
 import { notion, DB, P, p, queryAll, setCors } from "./_notion.js";
 
-// A habit-log page: { Date, HabitId, Done }
 function toEntry(page) {
   const props = page.properties;
+  const habitIds = p.relation(props.Habit);
   return {
     _pageId: page.id,
-    date: p.date(props.Date),
-    habitId: p.rich(props.HabitId),
+    date: p.date(props["Log Date"]),
+    habitId: habitIds[0] || null,
     done: p.checkbox(props.Done),
   };
 }
@@ -16,37 +16,35 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
 
   try {
-    // GET — return { date: { habitId: bool } } for a date range
     if (req.method === "GET") {
-      const { from, to } = req.query; // YYYY-MM-DD
+      const { from, to } = req.query;
       if (!from || !to) return res.status(400).json({ error: "from and to required" });
 
       const pages = await queryAll(DB.HABIT_LOG, {
         and: [
-          { property: "Date", date: { on_or_after: from } },
-          { property: "Date", date: { on_or_before: to } },
+          { property: "Log Date", date: { on_or_after: from } },
+          { property: "Log Date", date: { on_or_before: to } },
         ],
       });
 
       const log = {};
       for (const page of pages) {
         const e = toEntry(page);
+        if (!e.date || !e.habitId) continue;
         if (!log[e.date]) log[e.date] = {};
         log[e.date][e.habitId] = e.done;
       }
       return res.json(log);
     }
 
-    // PATCH — toggle a single habit on a date (find-or-create)
     if (req.method === "PATCH") {
       const { date, habitId, done } = req.body;
       if (!date || !habitId) return res.status(400).json({ error: "date and habitId required" });
 
-      // Try to find existing entry
       const pages = await queryAll(DB.HABIT_LOG, {
         and: [
-          { property: "Date",    date:     { equals: date } },
-          { property: "HabitId", rich_text: { equals: habitId } },
+          { property: "Log Date", date: { equals: date } },
+          { property: "Habit", relation: { contains: habitId } },
         ],
       });
 
@@ -60,10 +58,10 @@ export default async function handler(req, res) {
         page = await notion.pages.create({
           parent: { database_id: DB.HABIT_LOG },
           properties: {
-            Name:    P.title(`${date}|${habitId}`),
-            Date:    P.date(date),
-            HabitId: P.rich(habitId),
-            Done:    P.checkbox(done),
+            Date:       P.title(date),
+            "Log Date": P.date(date),
+            Habit:      P.relation([habitId]),
+            Done:       P.checkbox(done),
           },
         });
       }

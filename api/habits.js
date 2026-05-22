@@ -6,11 +6,10 @@ function toHabit(page) {
     _pageId: page.id,
     id: page.id,
     name: p.title(props.Name),
-    target: p.number(props.Target) ?? 5,
+    target: p.number(props["Target Per Week"]) ?? 5,
     account: ACC_REVERSE[p.select(props.Account)] || "personal",
-    goals: (() => {
-      try { return JSON.parse(p.rich(props.GoalIds) || "[]"); } catch { return []; }
-    })(),
+    active: p.checkbox(props.Active),
+    goals: p.relation(props.Goals),
   };
 }
 
@@ -29,10 +28,11 @@ export default async function handler(req, res) {
       const page = await notion.pages.create({
         parent: { database_id: DB.HABITS },
         properties: {
-          Name:    P.title(name),
-          Target:  P.number(target ?? 5),
-          Account: P.select(ACC_MAP[account] || "Personal"),
-          GoalIds: P.rich(JSON.stringify(goals || [])),
+          Name:              P.title(name),
+          "Target Per Week": P.number(target ?? 5),
+          Account:           P.select(ACC_MAP[account] || "Personal"),
+          Active:            P.checkbox(true),
+          Goals:             P.relation(goals || []),
         },
       });
       return res.json(toHabit(page));
@@ -43,10 +43,11 @@ export default async function handler(req, res) {
       if (!id) return res.status(400).json({ error: "id required" });
 
       const updates = {};
-      if (patch.name    !== undefined) updates.Name    = P.title(patch.name);
-      if (patch.target  !== undefined) updates.Target  = P.number(patch.target);
-      if (patch.account !== undefined) updates.Account = P.select(ACC_MAP[patch.account] || "Personal");
-      if (patch.goals   !== undefined) updates.GoalIds = P.rich(JSON.stringify(patch.goals || []));
+      if (patch.name    !== undefined) updates.Name               = P.title(patch.name);
+      if (patch.target  !== undefined) updates["Target Per Week"] = P.number(patch.target);
+      if (patch.account !== undefined) updates.Account            = P.select(ACC_MAP[patch.account] || "Personal");
+      if (patch.active  !== undefined) updates.Active             = P.checkbox(patch.active);
+      if (patch.goals   !== undefined) updates.Goals              = P.relation(patch.goals || []);
 
       const page = await notion.pages.update({ page_id: id, properties: updates });
       return res.json(toHabit(page));
