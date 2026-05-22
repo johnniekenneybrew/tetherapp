@@ -324,14 +324,16 @@ function RoutinesTab({ state, setState, actions }) {
                   onDragOver={(e) => { e.preventDefault(); setDragOverColId(r.id); }}
                   onDrop={() => { reorder(dragColId, r.id); setDragColId(null); setDragOverColId(null); }}
                   onDragEnd={() => { setDragColId(null); setDragOverColId(null); }}>
-                  <span className="drag-handle" style={{ display: "flex", justifyContent: "center", marginBottom: 2 }}><Icon.Grip /></span>
-                  <button className={"routine-head-btn" + (r.useIcon ? " is-icon" : "")}
-                    onClick={() => setEditingId(editingId === r.id ? null : r.id)}>
-                    {r.useIcon && r.icon
-                      ? <span className="routine-emoji">{r.icon}</span>
-                      : <span className="habit-row-name" style={{ fontSize: 13.5 }}>{r.name}</span>}
-                  </button>
-                  {r.trackOnly && <span className="track-only-label">*</span>}
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                    <span className="drag-handle drag-handle--h"><Icon.GripH /></span>
+                    <button className={"routine-head-btn" + (r.useIcon ? " is-icon" : "")}
+                      onClick={() => setEditingId(editingId === r.id ? null : r.id)}>
+                      {r.useIcon && r.icon
+                        ? <span className="routine-emoji">{r.icon}</span>
+                        : <span className="habit-row-name" style={{ fontSize: 13.5 }}>{r.name}</span>}
+                    </button>
+                    {r.trackOnly && <span className="track-only-label">*</span>}
+                  </div>
                   {editingId === r.id && (
                     <RoutineEditor routine={r}
                       onClose={() => setEditingId(null)}

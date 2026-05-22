@@ -1825,6 +1825,9 @@ textarea.input.is-filled--green {
   transition: color var(--t-fast);
   flex-shrink: 0;
 }
+.drag-handle--h {
+  width: auto; height: 14px; padding: 0 2px;
+}
 .drag-handle:hover { color: var(--text-2); background: var(--surface); }
 .drag-handle:active { cursor: grabbing; }
 .dragging-row { opacity: 0.35; }

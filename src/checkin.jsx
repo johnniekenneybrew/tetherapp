@@ -51,8 +51,8 @@ export function DailyCheckIn({ state, setState, navigateTo, actions }) {
     sectionsDone.priorities && sectionsDone.habits &&
     sectionsDone.gratitude && sectionsDone.learnings;
   const progressDone =
-    Number(sectionsDone.priorities) + Number(sectionsDone.habits) +
-    Number(sectionsDone.gratitude) + Number(sectionsDone.learnings);
+    (sectionsDone.priorities ? 1 : 0) + (sectionsDone.habits ? 1 : 0) +
+    (sectionsDone.gratitude ? 1 : 0) + (sectionsDone.learnings ? 1 : 0);
 
   useEffect(() => {
     if (allDone && !triggeredRef.current) {
