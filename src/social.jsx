@@ -15,7 +15,9 @@ const formatBirthday = (bday) => {
 const fmtBday = (bday) => {
   if (!bday) return "—";
   const d = new Date(bday + "T00:00:00");
-  return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+  const year = d.getFullYear();
+  if (year === 2000) return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${year}`;
 };
 
 const daysUntilBirthday = (bday) => {
@@ -253,6 +255,46 @@ export function SocialPage({ state, setState, actions }) {
   );
 }
 
+// ----------- Birthday input (month + day, optional year) -----------
+
+function BirthdayInput({ value, onChange }) {
+  const parse = (iso) => {
+    if (!iso) return { month: "", day: "", year: "" };
+    const d = new Date(iso + "T00:00:00");
+    return {
+      month: String(d.getMonth() + 1),
+      day: String(d.getDate()),
+      year: d.getFullYear() === 2000 ? "" : String(d.getFullYear()),
+    };
+  };
+  const [parts, setParts] = useState(() => parse(value));
+  const toISO = ({ month, day, year }) => {
+    if (!month || !day) return "";
+    const y = year && year.length === 4 ? year : "2000";
+    return `${y}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  };
+  const update = (patch) => {
+    const next = { ...parts, ...patch };
+    setParts(next);
+    onChange(toISO(next));
+  };
+  return (
+    <div style={{ display: "flex", gap: 6 }}>
+      <select className="input" style={{ flex: 2 }} value={parts.month}
+        onChange={(e) => update({ month: e.target.value })}>
+        <option value="">Month</option>
+        {MONTHS.map((m, i) => <option key={i} value={String(i + 1)}>{m}</option>)}
+      </select>
+      <input className="input" style={{ flex: 1 }} type="number"
+        placeholder="Day" min={1} max={31} value={parts.day}
+        onChange={(e) => update({ day: e.target.value })} />
+      <input className="input" style={{ flex: 1.5 }} type="number"
+        placeholder="Year" min={1900} max={2100} value={parts.year}
+        onChange={(e) => update({ year: e.target.value })} />
+    </div>
+  );
+}
+
 // ----------- Contact detail (expanded) -----------
 
 function ContactDetail({ contact, group, groups, onUpdate, onDelete, onAddNote, onDeleteNote }) {
@@ -329,7 +371,7 @@ function ContactDetail({ contact, group, groups, onUpdate, onDelete, onAddNote, 
             </div>
             <div className="field">
               <label>Birthday</label>
-              <input className="input" type="date" value={editBirthday} onChange={(e) => setEditBirthday(e.target.value)} />
+              <BirthdayInput value={editBirthday} onChange={setEditBirthday} />
             </div>
             <div className="field">
               <label>Last seen</label>
@@ -438,7 +480,7 @@ function AddContactModal({ groups, onClose, onSave }) {
           </div>
           <div className="field">
             <label>Birthday</label>
-            <input className="input" type="date" value={birthday} onChange={(e) => setBirthday(e.target.value)} />
+            <BirthdayInput value={birthday} onChange={setBirthday} />
           </div>
         </div>
         <div className="field">
