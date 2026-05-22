@@ -26,7 +26,16 @@ function AuthedApp() {
           display: "flex", alignItems: "center", justifyContent: "center",
           height: "80vh", flexDirection: "column", gap: 14,
         }}>
-          <div style={{ fontSize: 28 }}>🔗</div>
+          <svg width="48" height="48" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <line x1="6" y1="16" x2="16" y2="6" stroke="#6C63FF" strokeWidth="2" strokeLinecap="round"/>
+            <line x1="16" y1="6" x2="26" y2="16" stroke="#6C63FF" strokeWidth="2" strokeLinecap="round"/>
+            <line x1="6" y1="16" x2="16" y2="26" stroke="#6C63FF" strokeWidth="2" strokeLinecap="round" opacity="0.4"/>
+            <line x1="16" y1="26" x2="26" y2="16" stroke="#6C63FF" strokeWidth="2" strokeLinecap="round" opacity="0.4"/>
+            <circle cx="6" cy="16" r="3" fill="#6C63FF"/>
+            <circle cx="16" cy="6" r="3" fill="#6C63FF"/>
+            <circle cx="26" cy="16" r="3" fill="#6C63FF"/>
+            <circle cx="16" cy="26" r="2.2" fill="#6C63FF" opacity="0.4"/>
+          </svg>
           <div style={{ fontWeight: 600, fontSize: 15 }}>Loading Tether…</div>
           <div className="tiny">Connecting to Notion</div>
         </div>
