@@ -46,7 +46,7 @@ export function SocialPage({ state, setState, actions }) {
   }, [contacts]);
 
   const filtered = contacts.filter((c) => {
-    const matchGroup = groupFilter === "all" || c.group === groupFilter;
+    const matchGroup = groupFilter === "all" || (c.groups || []).includes(groupFilter);
     const matchTag = !tagFilter || (c.tags || []).includes(tagFilter);
     const matchSearch = !search || c.name.toLowerCase().includes(search.toLowerCase()) ||
       (c.city || "").toLowerCase().includes(search.toLowerCase());
@@ -54,16 +54,10 @@ export function SocialPage({ state, setState, actions }) {
   });
 
   const sorted = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
-
   const groupById = Object.fromEntries(groups.map((g) => [g.id, g]));
 
   const updateContact = (id, patch) => actions.updateContact(id, patch);
-
-  const deleteContact = (id) => {
-    actions.deleteContact(id);
-    setExpandedId(null);
-  };
-
+  const deleteContact = (id) => { actions.deleteContact(id); setExpandedId(null); };
   const addNote = (contactId, text) => actions.addNote(contactId, text);
   const deleteNote = (contactId, noteId) => actions.deleteNote(contactId, noteId);
 
@@ -159,69 +153,20 @@ export function SocialPage({ state, setState, actions }) {
 
       {/* Contact list */}
       <div className="contact-list">
-        {sorted.map((c) => {
-          const isOpen = expandedId === c.id;
-          const group = groupById[c.group];
-          const bdayDays = daysUntilBirthday(c.birthday);
-          return (
-            <div key={c.id} className={"contact-card" + (isOpen ? " is-open" : "")}>
-              <div className="contact-row" onClick={() => setExpandedId(isOpen ? null : c.id)}>
-                <div className="contact-avatar">
-                  {c.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}
-                </div>
-                <div className="contact-info">
-                  <div className="contact-name">{c.name}</div>
-                  <div className="contact-meta">
-                    {group && <span className="contact-group-tag">{group.icon || ""} {group.name}</span>}
-                    {c.city && <span>{c.city}</span>}
-                  </div>
-                  {(c.tags || []).length > 0 && (
-                    <div className="contact-tags">
-                      {c.tags.map((t) => <span key={t} className="contact-tag">{t}</span>)}
-                    </div>
-                  )}
-                </div>
-                {c.notes && c.notes.length > 0 && (
-                  <div className="contact-note-bubble">
-                    <span className="cnb-text">
-                      {c.notes[0].text.length > 55 ? c.notes[0].text.slice(0, 55) + "…" : c.notes[0].text}
-                    </span>
-                  </div>
-                )}
-                <div className="contact-stats">
-                  {c.birthday && (
-                    <span className={"contact-bday" + (bdayDays <= 7 ? " is-soon" : "")}>
-                      🎂 {formatBirthday(c.birthday)}
-                    </span>
-                  )}
-                  {c.lastSeen && (
-                    <span className="contact-lastseen">
-                      Last seen {c.lastSeen}
-                    </span>
-                  )}
-                </div>
-                <Icon.Chevron style={{
-                  transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-                  transition: "transform 150ms",
-                  color: "var(--text-3)",
-                  flexShrink: 0,
-                }} />
-              </div>
-
-              {isOpen && (
-                <ContactDetail
-                  contact={c}
-                  group={group}
-                  groups={groups}
-                  onUpdate={(patch) => updateContact(c.id, patch)}
-                  onDelete={() => deleteContact(c.id)}
-                  onAddNote={(text) => addNote(c.id, text)}
-                  onDeleteNote={(nid) => deleteNote(c.id, nid)}
-                />
-              )}
-            </div>
-          );
-        })}
+        {sorted.map((c) => (
+          <ContactCard
+            key={c.id}
+            c={c}
+            groupById={groupById}
+            allGroups={groups}
+            isOpen={expandedId === c.id}
+            onToggle={() => setExpandedId(expandedId === c.id ? null : c.id)}
+            onUpdate={(patch) => updateContact(c.id, patch)}
+            onDelete={() => deleteContact(c.id)}
+            onAddNote={(text) => addNote(c.id, text)}
+            onDeleteNote={(nid) => deleteNote(c.id, nid)}
+          />
+        ))}
 
         {sorted.length === 0 && (
           <div className="card" style={{ textAlign: "center", color: "var(--text-3)", padding: "40px 16px" }}>
@@ -255,64 +200,197 @@ export function SocialPage({ state, setState, actions }) {
   );
 }
 
-// ----------- Birthday input (month + day, optional year) -----------
+// ----------- Contact card (collapsed + inline editing) -----------
 
-function BirthdayInput({ value, onChange }) {
-  const parse = (iso) => {
-    if (!iso) return { month: "", day: "", year: "" };
-    const d = new Date(iso + "T00:00:00");
-    return {
-      month: String(d.getMonth() + 1),
-      day: String(d.getDate()),
-      year: d.getFullYear() === 2000 ? "" : String(d.getFullYear()),
+function ContactCard({ c, groupById, allGroups, isOpen, onToggle, onUpdate, onDelete, onAddNote, onDeleteNote }) {
+  const [showGroupPicker, setShowGroupPicker] = useState(false);
+  const [editLastSeen, setEditLastSeen] = useState(false);
+  const [lastSeenVal, setLastSeenVal] = useState(c.lastSeen || "");
+  const [editGift, setEditGift] = useState(false);
+  const [giftVal, setGiftVal] = useState(c.giftIdeas || "");
+  const pickerRef = useRef(null);
+
+  // Sync local state when contact data changes
+  useEffect(() => { setLastSeenVal(c.lastSeen || ""); }, [c.lastSeen]);
+  useEffect(() => { setGiftVal(c.giftIdeas || ""); }, [c.giftIdeas]);
+
+  useEffect(() => {
+    if (!showGroupPicker) return;
+    const handler = (e) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target)) setShowGroupPicker(false);
     };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showGroupPicker]);
+
+  const contactGroups = c.groups || [];
+  const bdayDays = daysUntilBirthday(c.birthday);
+  const availableGroups = allGroups.filter((g) => !contactGroups.includes(g.id));
+
+  const addGroup = (gid) => { onUpdate({ groups: [...contactGroups, gid] }); setShowGroupPicker(false); };
+  const removeGroup = (gid) => onUpdate({ groups: contactGroups.filter((id) => id !== gid) });
+
+  const saveLastSeen = () => {
+    setEditLastSeen(false);
+    if (lastSeenVal.trim() !== (c.lastSeen || "")) onUpdate({ lastSeen: lastSeenVal.trim() });
   };
-  const [parts, setParts] = useState(() => parse(value));
-  const toISO = ({ month, day, year }) => {
-    if (!month || !day) return "";
-    const y = year && year.length === 4 ? year : "2000";
-    return `${y}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+
+  const saveGift = () => {
+    setEditGift(false);
+    if (giftVal.trim() !== (c.giftIdeas || "")) onUpdate({ giftIdeas: giftVal.trim() });
   };
-  const update = (patch) => {
-    const next = { ...parts, ...patch };
-    setParts(next);
-    onChange(toISO(next));
-  };
+
   return (
-    <div style={{ display: "flex", gap: 6 }}>
-      <select className="input" style={{ flex: 2 }} value={parts.month}
-        onChange={(e) => update({ month: e.target.value })}>
-        <option value="">Month</option>
-        {MONTHS.map((m, i) => <option key={i} value={String(i + 1)}>{m}</option>)}
-      </select>
-      <input className="input" style={{ flex: 1 }} type="number"
-        placeholder="Day" min={1} max={31} value={parts.day}
-        onChange={(e) => update({ day: e.target.value })} />
-      <input className="input" style={{ flex: 1.5 }} type="number"
-        placeholder="Year" min={1900} max={2100} value={parts.year}
-        onChange={(e) => update({ year: e.target.value })} />
+    <div className={"contact-card" + (isOpen ? " is-open" : "")}>
+      <div className="contact-row" onClick={onToggle}>
+        <div className="contact-avatar">
+          {c.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}
+        </div>
+        <div className="contact-info">
+          <div className="contact-name">{c.name}</div>
+          <div className="contact-meta">
+            {/* Inline group tags with add/remove */}
+            <div className="contact-groups-inline" onClick={(e) => e.stopPropagation()}>
+              {contactGroups.map((gid) => {
+                const grp = groupById[gid];
+                if (!grp) return null;
+                return (
+                  <span key={gid} className="contact-group-tag">
+                    {grp.icon && <span style={{ marginRight: 3 }}>{grp.icon}</span>}
+                    {grp.name}
+                    <button className="group-tag-remove" onClick={(e) => { e.stopPropagation(); removeGroup(gid); }}>×</button>
+                  </span>
+                );
+              })}
+              {availableGroups.length > 0 && (
+                <div style={{ position: "relative" }} ref={pickerRef}>
+                  <button className="add-group-btn" onClick={(e) => { e.stopPropagation(); setShowGroupPicker((v) => !v); }}>+</button>
+                  {showGroupPicker && (
+                    <div className="group-picker-dropdown">
+                      {availableGroups.map((g) => (
+                        <button key={g.id} onClick={(e) => { e.stopPropagation(); addGroup(g.id); }}>
+                          {g.icon && <span style={{ marginRight: 5 }}>{g.icon}</span>}{g.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            {c.city && <span>{c.city}</span>}
+          </div>
+          {(c.tags || []).length > 0 && (
+            <div className="contact-tags">
+              {c.tags.map((t) => <span key={t} className="contact-tag">{t}</span>)}
+            </div>
+          )}
+          {/* Gift ideas inline edit */}
+          <div className="contact-gift-inline" onClick={(e) => e.stopPropagation()}>
+            {editGift ? (
+              <input
+                className="input input--xs"
+                value={giftVal}
+                onChange={(e) => setGiftVal(e.target.value)}
+                onBlur={saveGift}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") { e.preventDefault(); saveGift(); } }}
+                autoFocus
+                placeholder="Gift ideas…"
+              />
+            ) : (
+              <button className="inline-edit-trigger" onClick={(e) => { e.stopPropagation(); setGiftVal(c.giftIdeas || ""); setEditGift(true); }}>
+                {c.giftIdeas
+                  ? <><span style={{ opacity: 0.55, marginRight: 3 }}>🎁</span>{c.giftIdeas}</>
+                  : <span style={{ color: "var(--text-3)" }}>+ gift ideas</span>}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {c.notes && c.notes.length > 0 && (
+          <div className="contact-note-bubble">
+            <span className="cnb-text">
+              {c.notes[0].text.length > 55 ? c.notes[0].text.slice(0, 55) + "…" : c.notes[0].text}
+            </span>
+          </div>
+        )}
+
+        <div className="contact-stats">
+          {c.birthday && (
+            <span className={"contact-bday" + (bdayDays <= 7 ? " is-soon" : "")}>
+              🎂 {formatBirthday(c.birthday)}
+            </span>
+          )}
+          {/* Last seen inline edit */}
+          <span onClick={(e) => e.stopPropagation()}>
+            {editLastSeen ? (
+              <input
+                className="input input--xs"
+                value={lastSeenVal}
+                onChange={(e) => setLastSeenVal(e.target.value)}
+                onBlur={saveLastSeen}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") { e.preventDefault(); saveLastSeen(); } }}
+                autoFocus
+                placeholder="e.g. 2 weeks ago"
+                style={{ width: 130 }}
+              />
+            ) : (
+              <button className="inline-edit-trigger contact-lastseen"
+                onClick={(e) => { e.stopPropagation(); setLastSeenVal(c.lastSeen || ""); setEditLastSeen(true); }}>
+                {c.lastSeen
+                  ? `Seen ${c.lastSeen}`
+                  : <span style={{ color: "var(--text-3)" }}>+ last seen</span>}
+              </button>
+            )}
+          </span>
+        </div>
+
+        <Icon.Chevron style={{
+          transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+          transition: "transform 150ms",
+          color: "var(--text-3)",
+          flexShrink: 0,
+        }} />
+      </div>
+
+      {isOpen && (
+        <ContactDetail
+          contact={c}
+          groupById={groupById}
+          groups={allGroups}
+          onUpdate={onUpdate}
+          onDelete={onDelete}
+          onAddNote={onAddNote}
+          onDeleteNote={onDeleteNote}
+        />
+      )}
     </div>
   );
 }
 
 // ----------- Contact detail (expanded) -----------
 
-function ContactDetail({ contact, group, groups, onUpdate, onDelete, onAddNote, onDeleteNote }) {
+function ContactDetail({ contact, groupById, groups, onUpdate, onDelete, onAddNote, onDeleteNote }) {
   const [noteText, setNoteText] = useState("");
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(contact.name);
   const [editCity, setEditCity] = useState(contact.city || "");
   const [editBirthday, setEditBirthday] = useState(contact.birthday || "");
-  const [editGroup, setEditGroup] = useState(contact.group || "");
+  const [editGroups, setEditGroups] = useState(contact.groups || []);
   const [editLastSeen, setEditLastSeen] = useState(contact.lastSeen || "");
   const [editGiftIdeas, setEditGiftIdeas] = useState(contact.giftIdeas || "");
+
+  const toggleEditGroup = (gid) => {
+    setEditGroups((prev) =>
+      prev.includes(gid) ? prev.filter((id) => id !== gid) : [...prev, gid]
+    );
+  };
 
   const saveEdit = () => {
     onUpdate({
       name: editName.trim() || contact.name,
       city: editCity.trim(),
       birthday: editBirthday,
-      group: editGroup,
+      groups: editGroups,
       lastSeen: editLastSeen.trim(),
       giftIdeas: editGiftIdeas.trim(),
     });
@@ -329,6 +407,12 @@ function ContactDetail({ contact, group, groups, onUpdate, onDelete, onAddNote, 
     return `${mo} ${day} · ${h % 12 || 12}:${m} ${ampm}`;
   };
 
+  const contactGroupNames = (contact.groups || [])
+    .map((gid) => groupById[gid])
+    .filter(Boolean)
+    .map((g) => `${g.icon || ""} ${g.name}`.trim())
+    .join(", ");
+
   return (
     <div className="contact-detail fade-in">
       {!editing ? (
@@ -342,8 +426,8 @@ function ContactDetail({ contact, group, groups, onUpdate, onDelete, onAddNote, 
             <span className="cd-value">{contact.birthday ? fmtBday(contact.birthday) : "—"}</span>
           </div>
           <div className="cd-field">
-            <span className="cd-label">Group</span>
-            <span className="cd-value">{group ? `${group.icon || ""} ${group.name}` : "—"}</span>
+            <span className="cd-label">Groups</span>
+            <span className="cd-value">{contactGroupNames || "—"}</span>
           </div>
           <div className="cd-field">
             <span className="cd-label">Last seen</span>
@@ -379,11 +463,15 @@ function ContactDetail({ contact, group, groups, onUpdate, onDelete, onAddNote, 
             </div>
           </div>
           <div className="field">
-            <label>Group</label>
-            <select className="input" value={editGroup} onChange={(e) => setEditGroup(e.target.value)}>
-              <option value="">No group</option>
-              {groups.map((g) => <option key={g.id} value={g.id}>{g.icon} {g.name}</option>)}
-            </select>
+            <label>Groups</label>
+            <div className="group-checkboxes">
+              {groups.map((g) => (
+                <label key={g.id} className={"group-checkbox-label" + (editGroups.includes(g.id) ? " is-checked" : "")}>
+                  <input type="checkbox" checked={editGroups.includes(g.id)} onChange={() => toggleEditGroup(g.id)} />
+                  {g.icon && <span>{g.icon}</span>} {g.name}
+                </label>
+              ))}
+            </div>
           </div>
           <div className="field">
             <label>Gift ideas</label>
@@ -441,14 +529,60 @@ function ContactDetail({ contact, group, groups, onUpdate, onDelete, onAddNote, 
   );
 }
 
+// ----------- Birthday input (month + day, optional year) -----------
+
+function BirthdayInput({ value, onChange }) {
+  const parse = (iso) => {
+    if (!iso) return { month: "", day: "", year: "" };
+    const d = new Date(iso + "T00:00:00");
+    return {
+      month: String(d.getMonth() + 1),
+      day: String(d.getDate()),
+      year: d.getFullYear() === 2000 ? "" : String(d.getFullYear()),
+    };
+  };
+  const [parts, setParts] = useState(() => parse(value));
+  const toISO = ({ month, day, year }) => {
+    if (!month || !day) return "";
+    const y = year && year.length === 4 ? year : "2000";
+    return `${y}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  };
+  const update = (patch) => {
+    const next = { ...parts, ...patch };
+    setParts(next);
+    onChange(toISO(next));
+  };
+  return (
+    <div style={{ display: "flex", gap: 6 }}>
+      <select className="input" style={{ flex: 2 }} value={parts.month}
+        onChange={(e) => update({ month: e.target.value })}>
+        <option value="">Month</option>
+        {MONTHS.map((m, i) => <option key={i} value={String(i + 1)}>{m}</option>)}
+      </select>
+      <input className="input" style={{ flex: 1 }} type="number"
+        placeholder="Day" min={1} max={31} value={parts.day}
+        onChange={(e) => update({ day: e.target.value })} />
+      <input className="input" style={{ flex: 1.5 }} type="number"
+        placeholder="Year" min={1900} max={2100} value={parts.year}
+        onChange={(e) => update({ year: e.target.value })} />
+    </div>
+  );
+}
+
 // ----------- Add Contact modal -----------
 
 function AddContactModal({ groups, onClose, onSave }) {
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
   const [birthday, setBirthday] = useState("");
-  const [group, setGroup] = useState(groups[0]?.id || "");
+  const [selectedGroups, setSelectedGroups] = useState([]);
   const [lastSeen, setLastSeen] = useState("");
+
+  const toggleGroup = (gid) => {
+    setSelectedGroups((prev) =>
+      prev.includes(gid) ? prev.filter((id) => id !== gid) : [...prev, gid]
+    );
+  };
 
   const save = () => {
     if (!name.trim()) return;
@@ -457,7 +591,7 @@ function AddContactModal({ groups, onClose, onSave }) {
       name: name.trim(),
       city: city.trim(),
       birthday: birthday || null,
-      group,
+      groups: selectedGroups,
       lastSeen: lastSeen.trim() || null,
       notes: [],
     });
@@ -483,13 +617,19 @@ function AddContactModal({ groups, onClose, onSave }) {
             <BirthdayInput value={birthday} onChange={setBirthday} />
           </div>
         </div>
-        <div className="field">
-          <label>Group</label>
-          <select className="input" value={group} onChange={(e) => setGroup(e.target.value)}>
-            <option value="">No group</option>
-            {groups.map((g) => <option key={g.id} value={g.id}>{g.icon} {g.name}</option>)}
-          </select>
-        </div>
+        {groups.length > 0 && (
+          <div className="field">
+            <label>Groups</label>
+            <div className="group-checkboxes">
+              {groups.map((g) => (
+                <label key={g.id} className={"group-checkbox-label" + (selectedGroups.includes(g.id) ? " is-checked" : "")}>
+                  <input type="checkbox" checked={selectedGroups.includes(g.id)} onChange={() => toggleGroup(g.id)} />
+                  {g.icon && <span>{g.icon}</span>} {g.name}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="field">
           <label>Last seen</label>
           <input className="input" placeholder="e.g. Last week, March 2026" value={lastSeen} onChange={(e) => setLastSeen(e.target.value)} />
