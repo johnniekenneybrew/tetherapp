@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useUser } from '@clerk/clerk-react';
 import { TODAY, addDays, weekStart } from './shared';
 import {
   tasksApi, checkinApi, habitsApi, habitLogApi,
@@ -35,9 +36,30 @@ const EMPTY = {
 // Hook
 // ============================================================
 export function useAppData() {
-  const [state, setStateRaw] = useState(EMPTY);
+  const { user } = useUser();
+  const userId = user?.id;
+
+  const [state, setStateRaw] = useState(() => {
+    try {
+      const key = userId ? `tether_accounts_${userId}` : 'tether_accounts';
+      const saved = JSON.parse(localStorage.getItem(key));
+      return { ...EMPTY, accounts: saved || null };
+    } catch {
+      return EMPTY;
+    }
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError]   = useState(null);
+
+  // Persist area settings to localStorage whenever they change
+  useEffect(() => {
+    if (state.accounts) {
+      try {
+        const key = userId ? `tether_accounts_${userId}` : 'tether_accounts';
+        localStorage.setItem(key, JSON.stringify(state.accounts));
+      } catch {}
+    }
+  }, [state.accounts, userId]);
 
   // Checkin page ID (needed for PATCH)
   const [checkinPageId, setCheckinPageId] = useState(null);

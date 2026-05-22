@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
+import { useUser } from '@clerk/clerk-react';
 
 function applyOrder(orderIds, items) {
   if (!orderIds || !orderIds.length) return items;
@@ -10,8 +11,13 @@ function applyOrder(orderIds, items) {
 }
 
 export function useOrder(storageKey, items) {
+  const { user } = useUser();
+  const scopedKey = user?.id ? `${user.id}_${storageKey}` : storageKey;
+  const scopedKeyRef = useRef(scopedKey);
+  scopedKeyRef.current = scopedKey;
+
   const [orderIds, setOrderIds] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(storageKey)) || null; }
+    try { return JSON.parse(localStorage.getItem(scopedKey)) || null; }
     catch { return null; }
   });
 
@@ -27,7 +33,7 @@ export function useOrder(storageKey, items) {
       const next = [...ids];
       next.splice(from, 1);
       next.splice(to, 0, fromId);
-      try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch {}
+      try { localStorage.setItem(scopedKeyRef.current, JSON.stringify(next)); } catch {}
       return next;
     });
   }, [items, storageKey]);
