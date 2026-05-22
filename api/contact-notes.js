@@ -37,7 +37,7 @@ export default async function handler(req, res) {
         properties: {
           Note:      P.title(text),
           Contact:   P.relation([contactId]),
-          Timestamp: P.date(ts.slice(0, 10)),
+          Timestamp: P.date(ts),
         },
       });
       return res.json(toNote(page));

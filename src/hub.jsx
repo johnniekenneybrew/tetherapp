@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   ACCOUNTS, TODAY, fmtShort, fmtMD, addDays, weekStart, sameDay, DAYS, MONTHS,
   Checkbox, AccountDot, StatusBadge, Icon,
@@ -711,22 +711,62 @@ function AddGoalModal({ onClose, state, setState, actions }) {
 
 function WamTab({ state }) {
   const [selectedGoal, setSelectedGoal] = useState("all");
-  const [weekOffset, setWeekOffset] = useState(-1);
-  const habitsById = Object.fromEntries(state.habits.map((h) => [h.id, h]));
+  const [weekOffset, setWeekOffset] = useState(0);
 
-  const isLast = weekOffset === -1;
-  const weekLabel = isLast ? "Last week" : "This week";
-  const weekNumLabel = isLast ? "Week 6 of Q2 · May 11 – 17" : "Week 7 of Q2 · May 18 – 24";
+  const habitsById = useMemo(
+    () => Object.fromEntries(state.habits.map((h) => [h.id, h])),
+    [state.habits]
+  );
 
-  const goalPct = (g) => (isLast ? g.prevPct : g.weekPct);
+  const viewWeekStart = useMemo(
+    () => addDays(weekStart(TODAY), weekOffset * 7),
+    [weekOffset]
+  );
+  const viewWeekEnd = addDays(viewWeekStart, 6);
+
+  const weekDays = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => addDays(viewWeekStart, i).toISOString().slice(0, 10)),
+    [viewWeekStart]
+  );
+
+  const computeGoalPct = useCallback((goal) => {
+    const pcts = goal.habitIds
+      .map((hid) => {
+        const h = habitsById[hid];
+        if (!h) return null;
+        const target = Math.max(1, h.target || 7);
+        const done = weekDays.filter((d) => state.habitLog[d]?.[hid]).length;
+        return Math.min(100, Math.round((done / target) * 100));
+      })
+      .filter((p) => p !== null);
+    return pcts.length === 0 ? 0 : Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length);
+  }, [habitsById, weekDays, state.habitLog]);
+
+  const fmtRange = (s, e) => {
+    const start = `${MONTHS[s.getMonth()].slice(0, 3)} ${s.getDate()}`;
+    const end = s.getMonth() === e.getMonth()
+      ? String(e.getDate())
+      : `${MONTHS[e.getMonth()].slice(0, 3)} ${e.getDate()}`;
+    return `${start} – ${end}`;
+  };
+
+  const qWeekLabel = useMemo(() => {
+    const m = viewWeekStart.getMonth();
+    const q = Math.floor(m / 3) + 1;
+    const qStart = new Date(viewWeekStart.getFullYear(), Math.floor(m / 3) * 3, 1);
+    const wNum = Math.floor((viewWeekStart - qStart) / (7 * 24 * 60 * 60 * 1000)) + 1;
+    return `Week ${wNum} of Q${q}`;
+  }, [viewWeekStart]);
+
+  const weekLabel = weekOffset === 0 ? "This week" : weekOffset === -1 ? "Last week" : fmtRange(viewWeekStart, viewWeekEnd);
 
   const WeekNav = () => (
     <div className="row" style={{ gap: 6 }}>
-      <button className="btn-text" onClick={() => setWeekOffset((o) => o - 1)} disabled={weekOffset <= -1}>
+      <button className="btn-text" onClick={() => setWeekOffset((o) => o - 1)} disabled={weekOffset <= -8}>
         <Icon.ChevL /> Previous
       </button>
-      <span style={{ fontSize: 13.5, fontWeight: 600, minWidth: 200, textAlign: "center" }}>
-        {weekNumLabel}
+      <span style={{ fontSize: 13.5, fontWeight: 600, minWidth: 220, textAlign: "center" }}>
+        {qWeekLabel} · {fmtRange(viewWeekStart, viewWeekEnd)}
       </span>
       <button className="btn-text" onClick={() => setWeekOffset((o) => o + 1)} disabled={weekOffset >= 0}>
         Next <Icon.ChevR />
@@ -736,9 +776,9 @@ function WamTab({ state }) {
 
   if (selectedGoal === "all") {
     const active = state.goals.filter((g) => g.status !== "completed");
-    const avg = Math.round(active.reduce((a, g) => a + goalPct(g), 0) / (active.length || 1));
-    const compareAvg = Math.round(active.reduce((a, g) => a + (isLast ? g.weekPct : g.prevPct), 0) / (active.length || 1));
-    const compareLabel = isLast ? "this week (in progress)" : "previous week";
+    const goalPcts = active.map((g) => computeGoalPct(g));
+    const avg = active.length === 0 ? 0 : Math.round(goalPcts.reduce((a, b) => a + b, 0) / active.length);
+
     return (
       <div>
         <div className="row" style={{ justifyContent: "space-between", marginBottom: 18 }}>
@@ -761,14 +801,15 @@ function WamTab({ state }) {
             <span style={{ width: avg + "%" }} />
           </div>
           <div className="wam-meta">
-            Across {active.length} active goals · {compareLabel} {compareAvg}%
+            Across {active.length} active goal{active.length !== 1 ? "s" : ""}
+            {weekOffset === 0 ? " · in progress" : ""}
           </div>
         </div>
 
         <h3 className="section-title">Goals breakdown</h3>
         <div className="card">
-          {active.map((g) => {
-            const p = goalPct(g);
+          {active.map((g, i) => {
+            const p = goalPcts[i];
             return (
               <div key={g.id} className="habit-perf">
                 <div style={{ minWidth: 0 }}>
@@ -788,6 +829,9 @@ function WamTab({ state }) {
               </div>
             );
           })}
+          {active.length === 0 && (
+            <div className="tiny" style={{ padding: 12, color: "var(--text-3)" }}>No active goals.</div>
+          )}
         </div>
       </div>
     );
@@ -795,19 +839,15 @@ function WamTab({ state }) {
 
   const g = state.goals.find((x) => x.id === selectedGoal);
   if (!g) return null;
-  const pct = goalPct(g);
-  const comparePct = isLast ? g.weekPct : g.prevPct;
-  const compareLabel = isLast ? "This week (in progress)" : "Previous week";
+  const pct = computeGoalPct(g);
 
-  const habitPcts = g.habitIds.map((hid, i) => {
-    const seed = (hid + i + g.id).length;
-    const base = [71, 78, 89, 65, 92, 83, 70][seed % 7];
-    const adj = isLast ? Math.round(base * 0.94) : base;
-    return { id: hid, name: habitsById[hid]?.name || "—", account: habitsById[hid]?.account, pct: adj };
+  const habitBreakdown = g.habitIds.map((hid) => {
+    const h = habitsById[hid];
+    if (!h) return { id: hid, name: "—", completions: 0, target: 1, pct: 0 };
+    const target = Math.max(1, h.target || 7);
+    const completions = weekDays.filter((d) => state.habitLog[d]?.[hid]).length;
+    return { id: hid, name: h.name, account: h.account, completions, target, pct: Math.min(100, Math.round((completions / target) * 100)) };
   });
-
-  const trendBase = [68, 72, 65, 80, 74, 82, g.weekPct];
-  const trend = [...trendBase, 0, 0, 0, 0, 0];
 
   return (
     <div>
@@ -825,31 +865,25 @@ function WamTab({ state }) {
       </div>
       <p className="tiny" style={{ marginBottom: 22 }}>Target: {g.target} · {g.description}</p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 16 }}>
-        <div className={"wam-hero " + (pct >= 80 ? "is-good" : "is-warn")} style={{ margin: 0 }}>
-          <div className="tiny" style={{ marginBottom: 6 }}>{weekLabel}</div>
+      <div className={"wam-hero " + (pct >= 80 ? "is-good" : "is-warn")} style={{ margin: 0, marginBottom: 20 }}>
+        <div className="tiny" style={{ marginBottom: 6 }}>{weekLabel}'s performance · target 80%</div>
+        <div className="row" style={{ alignItems: "baseline", gap: 14 }}>
           <span className="wam-num">{pct}%</span>
-          <div className="wam-meta">{pct >= 80 ? "On track" : `${Math.max(0, 80 - pct)} points below target`}</div>
-          <div className={"bar bar--lg " + (pct >= 80 ? "is-good" : "is-warn")} style={{ marginTop: 14 }}>
-            <span style={{ width: pct + "%" }} />
-          </div>
+          <StatusBadge status={pct >= 80 ? "on-track" : "below"} />
         </div>
-        <div className="card" style={{ margin: 0 }}>
-          <div className="tiny">{compareLabel}</div>
-          <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: "-0.02em", marginTop: 4 }}>
-            {comparePct}%
-          </div>
-          <div className="bar" style={{ marginTop: 10 }}><span style={{ width: comparePct + "%", background: "var(--text-3)" }} /></div>
-          <div className="tiny" style={{ marginTop: 6 }}>{comparePct >= 80 ? "On track" : "Below target"}</div>
+        <div className={"bar bar--lg " + (pct >= 80 ? "is-good" : "is-warn")} style={{ marginTop: 14 }}>
+          <span style={{ width: pct + "%" }} />
         </div>
+        <div className="wam-meta">{pct >= 80 ? "On track" : `${Math.max(0, 80 - pct)} points below target`}</div>
       </div>
 
-      <h3 className="section-title" style={{ marginTop: 28 }}>Linked habits · {weekLabel.toLowerCase()}</h3>
+      <h3 className="section-title">Linked habits · {weekLabel.toLowerCase()}</h3>
       <div className="card">
-        {habitPcts.map((h) => (
+        {habitBreakdown.map((h) => (
           <div key={h.id} className="habit-perf">
-            <div className="row" style={{ gap: 8 }}>
-              <AccountDot acc={h.account} /> <span className="hp-name">{h.name}</span>
+            <div style={{ minWidth: 0 }}>
+              <div className="hp-name">{h.name}</div>
+              <div className="tiny" style={{ color: "var(--text-3)" }}>{h.completions}/{h.target} days</div>
             </div>
             <span className="hp-pct">{h.pct}%</span>
             <div className={"bar " + (h.pct >= 80 ? "is-good" : "is-warn")}>
@@ -858,26 +892,9 @@ function WamTab({ state }) {
             <StatusBadge status={h.pct >= 80 ? "on-track" : "needs"} />
           </div>
         ))}
-      </div>
-
-      <h3 className="section-title" style={{ marginTop: 28 }}>Quarterly trend</h3>
-      <div className="card">
-        <div className="chart">
-          {trend.map((v, i) => {
-            const isCurrent = i === 6;
-            const future = v === 0;
-            const h = future ? 6 : Math.max(8, (v / 100) * 140);
-            const cls = future ? "" : v >= 80 ? "is-good" : "is-warn";
-            return (
-              <div key={i} className="bar-col">
-                <div className="bar-val">{future ? "" : v + "%"}</div>
-                <div className={"bar-fill " + cls + (isCurrent ? " is-current" : "")}
-                  style={{ height: h, background: future ? "var(--surface-2)" : undefined }} />
-                <div className="bar-label">W{i + 1}</div>
-              </div>
-            );
-          })}
-        </div>
+        {habitBreakdown.length === 0 && (
+          <div className="tiny" style={{ padding: 12, color: "var(--text-3)" }}>No habits linked to this goal.</div>
+        )}
       </div>
     </div>
   );
