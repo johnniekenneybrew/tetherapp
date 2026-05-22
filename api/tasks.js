@@ -1,7 +1,7 @@
 import { notion, DB, ACC_MAP, ACC_REVERSE, P, p, queryAll, setCors } from "./_notion.js";
 
-const TODAY_ISO = "2026-05-22";
-const TODAY_MS = new Date(2026, 4, 22).getTime();
+const TODAY_ISO = new Date().toISOString().slice(0, 10);
+const TODAY_MS = new Date(TODAY_ISO + "T00:00:00").getTime();
 
 function isoToDue(iso) {
   if (!iso) return null;

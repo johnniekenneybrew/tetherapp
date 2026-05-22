@@ -13,8 +13,7 @@ export const ACCOUNTS = [
 ];
 export const accLookup = Object.fromEntries(ACCOUNTS.map((a) => [a.id, a]));
 
-// Fixed "today" so the prototype is stable
-export const TODAY = new Date(2026, 4, 22); // May 22 2026, a Thursday
+export const TODAY = new Date();
 
 export const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 export const DAYS_LONG = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
@@ -48,6 +47,7 @@ export const Icon = {
   ChevR: (p) => (<svg width="12" height="12" viewBox="0 0 12 12" fill="none" {...p}><path d="M4.5 3L8 6l-3.5 3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>),
   Cal: (p) => (<svg width="13" height="13" viewBox="0 0 14 14" fill="none" {...p}><rect x="2" y="3" width="10" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.4"/><path d="M2 6h10M5 2v2M9 2v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>),
   Sun: (p) => (<svg width="14" height="14" viewBox="0 0 14 14" fill="none" {...p}><circle cx="7" cy="7" r="2.5" stroke="currentColor" strokeWidth="1.4"/><path d="M7 1.5v1.5M7 11v1.5M1.5 7H3M11 7h1.5M3 3l1 1M10 10l1 1M3 11l1-1M10 4l1-1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>),
+  Grip: (p) => (<svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" {...p}><circle cx="3" cy="3.5" r="1.2"/><circle cx="7" cy="3.5" r="1.2"/><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="3" cy="10.5" r="1.2"/><circle cx="7" cy="10.5" r="1.2"/></svg>),
 };
 
 // ----------- Primitives -----------
@@ -131,7 +131,9 @@ export function EmojiRain({ duration = 2800, count = 56, onDone }) {
 
 export function TopBar({ route, setRoute, dateLabel, onHubTab }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [dropOpen, setDropOpen] = useState(null); // which nav dropdown is open: "hub" | "social" | null
+  const [dropOpen, setDropOpen] = useState(null);
+  const menuTimer = useRef(null);
+  const dropTimer = useRef(null);
 
   const items = [
     { id: "checkin", label: "Daily Check-In" },
@@ -188,8 +190,8 @@ export function TopBar({ route, setRoute, dateLabel, onHubTab }) {
             if (isDropdown) {
               return (
                 <div key={it.id} data-nav-drop style={{ position: "relative" }}
-                  onMouseEnter={() => setDropOpen(it.id)}
-                  onMouseLeave={() => setDropOpen(null)}>
+                  onMouseEnter={() => { clearTimeout(dropTimer.current); setDropOpen(it.id); }}
+                  onMouseLeave={() => { dropTimer.current = setTimeout(() => setDropOpen(null), 150); }}>
                   <button
                     className={route.page === it.id ? "active" : ""}
                     onClick={() => setRoute({ page: it.id })}>
@@ -236,10 +238,10 @@ export function TopBar({ route, setRoute, dateLabel, onHubTab }) {
             ))}
           </nav>
           <span className="nav-divider" />
-          <span className="hint"><Icon.Sun /> Thu · {dateLabel}</span>
+          <span className="hint"><Icon.Sun /> {DAYS[TODAY.getDay()]} · {dateLabel}</span>
           <div data-avatar-menu style={{ position: "relative" }}
-            onMouseEnter={() => setMenuOpen(true)}
-            onMouseLeave={() => setMenuOpen(false)}>
+            onMouseEnter={() => { clearTimeout(menuTimer.current); setMenuOpen(true); }}
+            onMouseLeave={() => { menuTimer.current = setTimeout(() => setMenuOpen(false), 150); }}>
             <button
               className={"avatar" + (route.page === "settings" ? " is-active" : "")}
               aria-expanded={menuOpen}

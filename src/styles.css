@@ -1719,3 +1719,17 @@ textarea.input.is-filled--green {
 .center { align-items: center; }
 .w-full { width: 100%; }
 .text-right { text-align: right; }
+
+/* Drag-to-reorder */
+.drag-handle {
+  display: flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px;
+  color: var(--text-3); cursor: grab; border-radius: 4px;
+  transition: color var(--t-fast);
+  flex-shrink: 0;
+}
+.drag-handle:hover { color: var(--text-2); background: var(--surface); }
+.drag-handle:active { cursor: grabbing; }
+.dragging-row { opacity: 0.35; }
+.drag-over-row { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
+.drag-over-col { outline: 2px solid var(--accent); outline-offset: -2px; }

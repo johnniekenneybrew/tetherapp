@@ -3,6 +3,7 @@ import {
   ACCOUNTS, TODAY, fmtShort, fmtMD, addDays, weekStart, sameDay, DAYS, MONTHS,
   Checkbox, AccountDot, StatusBadge, Icon,
 } from './shared';
+import { useOrder } from './useOrder';
 
 // ============================================================
 // Habits + Health hub
@@ -46,10 +47,12 @@ function HabitsTab({ state, setState, actions }) {
   const [weekOffset, setWeekOffset] = useState(0);
   const start = addDays(ws, weekOffset * 7);
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
-  const habits = state.habits;
   const [goalFilter, setGoalFilter] = useState("all");
   const [showAddHabit, setShowAddHabit] = useState(false);
+  const [dragId, setDragId] = useState(null);
+  const [dragOverId, setDragOverId] = useState(null);
 
+  const { ordered: habits, reorder } = useOrder("habitOrder", state.habits);
   const filteredHabits = habits.filter((h) =>
     goalFilter === "all" || (h.goals || []).includes(goalFilter)
   );
@@ -95,6 +98,7 @@ function HabitsTab({ state, setState, actions }) {
         <table>
           <thead>
             <tr>
+              <th style={{ width: 28 }} />
               <th style={{ width: 240 }}>Habit</th>
               {days.map((d, i) => {
                 const isToday = sameDay(d, TODAY);
@@ -118,7 +122,16 @@ function HabitsTab({ state, setState, actions }) {
               const cls = pct >= 1 ? "is-good" : pct >= 0.5 ? "is-warn" : "";
               const linkedGoals = (h.goals || []).map((gid) => state.goals.find((g) => g.id === gid)).filter(Boolean);
               return (
-                <tr key={h.id}>
+                <tr key={h.id}
+                  draggable
+                  onDragStart={() => setDragId(h.id)}
+                  onDragOver={(e) => { e.preventDefault(); setDragOverId(h.id); }}
+                  onDrop={() => { reorder(dragId, h.id); setDragId(null); setDragOverId(null); }}
+                  onDragEnd={() => { setDragId(null); setDragOverId(null); }}
+                  className={(dragId === h.id ? "dragging-row " : "") + (dragOverId === h.id && dragId !== h.id ? "drag-over-row" : "")}>
+                  <td style={{ padding: "0 4px" }}>
+                    <span className="drag-handle"><Icon.Grip /></span>
+                  </td>
                   <td className="col-habit">
                     <div className="habit-row-name">{h.name}</div>
                     <div className="habit-row-meta">
@@ -252,9 +265,12 @@ function RoutinesTab({ state, setState, actions }) {
   const [weekOffset, setWeekOffset] = useState(0);
   const start = addDays(ws, weekOffset * 7);
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
-  const routines = state.routines;
   const dayLetters = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const [editingId, setEditingId] = useState(null);
+  const [dragColId, setDragColId] = useState(null);
+  const [dragOverColId, setDragOverColId] = useState(null);
+
+  const { ordered: routines, reorder } = useOrder("routineOrder", state.routines);
 
   const toggleR = (date, rid) => {
     actions.toggleRoutineLog(date, rid);
@@ -299,7 +315,16 @@ function RoutinesTab({ state, setState, actions }) {
             <tr>
               <th style={{ width: 120 }}>Day</th>
               {routines.map((r) => (
-                <th key={r.id} className={"cb-cell routine-head-th" + (r.trackOnly ? " is-track-only" : "")} style={{ textAlign: "center" }} title={r.name + (r.trackOnly ? " (tracking only)" : "")}>
+                <th key={r.id}
+                  className={"cb-cell routine-head-th" + (r.trackOnly ? " is-track-only" : "") + (dragColId === r.id ? " dragging-row" : "") + (dragOverColId === r.id && dragColId !== r.id ? " drag-over-col" : "")}
+                  style={{ textAlign: "center" }}
+                  title={r.name + (r.trackOnly ? " (tracking only)" : "")}
+                  draggable
+                  onDragStart={() => setDragColId(r.id)}
+                  onDragOver={(e) => { e.preventDefault(); setDragOverColId(r.id); }}
+                  onDrop={() => { reorder(dragColId, r.id); setDragColId(null); setDragOverColId(null); }}
+                  onDragEnd={() => { setDragColId(null); setDragOverColId(null); }}>
+                  <span className="drag-handle" style={{ display: "flex", justifyContent: "center", marginBottom: 2 }}><Icon.Grip /></span>
                   <button className={"routine-head-btn" + (r.useIcon ? " is-icon" : "")}
                     onClick={() => setEditingId(editingId === r.id ? null : r.id)}>
                     {r.useIcon && r.icon

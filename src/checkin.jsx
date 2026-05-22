@@ -3,6 +3,7 @@ import {
   ACCOUNTS, TODAY, fmtLong, addDays,
   Icon, Checkbox, AccountDot, EmojiRain,
 } from './shared';
+import { useOrder } from './useOrder';
 
 // ============================================================
 // Daily Check-In (desktop two-column)
@@ -11,11 +12,16 @@ import {
 export function DailyCheckIn({ state, setState, navigateTo, actions }) {
   const today = TODAY;
   const yest = addDays(today, -1);
-  const habits = state.habits;
-  const routines = state.routines;
   const yKey = yest.toISOString().slice(0, 10);
+  const { ordered: habits, reorder: reorderHabits } = useOrder("habitOrder", state.habits);
+  const { ordered: routines, reorder: reorderRoutines } = useOrder("routineOrder", state.routines);
   const yestHabitStatus = state.habitLog[yKey] || {};
   const yestRoutineStatus = state.routineLog[yKey] || {};
+
+  const [dragHabitId, setDragHabitId] = useState(null);
+  const [dragOverHabitId, setDragOverHabitId] = useState(null);
+  const [dragRoutineId, setDragRoutineId] = useState(null);
+  const [dragOverRoutineId, setDragOverRoutineId] = useState(null);
 
   const [priorities, setPriorities] = useState(state.checkin?.priorities || []);
   const [newPriority, setNewPriority] = useState("");
@@ -207,9 +213,15 @@ export function DailyCheckIn({ state, setState, navigateTo, actions }) {
                   <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
                     {habits.map((h) => (
                       <li key={h.id}
-                        onClick={() => !sectionsDone.habits && toggleYHabit(h.id)}
-                        className="yh-row">
-                        <span style={{ fontSize: 13.5 }}>{h.name}</span>
+                        className={"yh-row" + (dragHabitId === h.id ? " dragging-row" : "") + (dragOverHabitId === h.id && dragHabitId !== h.id ? " drag-over-row" : "")}
+                        draggable
+                        onDragStart={() => setDragHabitId(h.id)}
+                        onDragOver={(e) => { e.preventDefault(); setDragOverHabitId(h.id); }}
+                        onDrop={() => { reorderHabits(dragHabitId, h.id); setDragHabitId(null); setDragOverHabitId(null); }}
+                        onDragEnd={() => { setDragHabitId(null); setDragOverHabitId(null); }}
+                        onClick={() => !sectionsDone.habits && toggleYHabit(h.id)}>
+                        <span className="drag-handle" style={{ marginRight: 4 }}><Icon.Grip /></span>
+                        <span style={{ fontSize: 13.5, flex: 1 }}>{h.name}</span>
                         <Checkbox
                           checked={!!yestHabitStatus[h.id]}
                           onChange={() => !sectionsDone.habits && toggleYHabit(h.id)}
@@ -224,10 +236,16 @@ export function DailyCheckIn({ state, setState, navigateTo, actions }) {
                   <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
                     {routines.map((r) => (
                       <li key={r.id}
+                        className={"yh-row" + (dragRoutineId === r.id ? " dragging-row" : "") + (dragOverRoutineId === r.id && dragRoutineId !== r.id ? " drag-over-row" : "")}
+                        draggable
+                        onDragStart={() => setDragRoutineId(r.id)}
+                        onDragOver={(e) => { e.preventDefault(); setDragOverRoutineId(r.id); }}
+                        onDrop={() => { reorderRoutines(dragRoutineId, r.id); setDragRoutineId(null); setDragOverRoutineId(null); }}
+                        onDragEnd={() => { setDragRoutineId(null); setDragOverRoutineId(null); }}
                         onClick={() => !sectionsDone.habits && toggleYRoutine(r.id)}
-                        className="yh-row"
                         title={r.name}>
-                        <span style={{ fontSize: r.useIcon && r.icon ? 18 : 13.5 }}>
+                        <span className="drag-handle" style={{ marginRight: 4 }}><Icon.Grip /></span>
+                        <span style={{ fontSize: r.useIcon && r.icon ? 18 : 13.5, flex: 1 }}>
                           {r.useIcon && r.icon ? r.icon : r.name}
                         </span>
                         <Checkbox
