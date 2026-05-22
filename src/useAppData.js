@@ -3,7 +3,7 @@ import { useUser } from '@clerk/clerk-react';
 import { TODAY, addDays, weekStart } from './shared';
 import {
   tasksApi, checkinApi, habitsApi, habitLogApi,
-  routinesApi, routineLogApi, goalsApi,
+  routinesApi, routineLogApi, goalsApi, goalTasksApi,
   contactsApi, contactNotesApi, contactGroupsApi,
   prefsApi,
 } from './api';
@@ -26,6 +26,7 @@ const EMPTY = {
   habits:        [],
   routines:      [],
   goals:         [],
+  goalTasks:     [],
   habitLog:      {},
   routineLog:    {},
   checkin:       { gratitude: ["", "", ""], learnings: ["", "", ""], sectionsDone: {}, completed: false, habitsUpdatedConfirmed: false },
@@ -89,7 +90,7 @@ export function useAppData() {
     async function loadAll() {
       try {
         const [
-          todos, habits, routines, goals,
+          todos, habits, routines, goals, goalTasks,
           habitLog, routineLog,
           checkin,
           contacts, contactGroups,
@@ -99,6 +100,7 @@ export function useAppData() {
           habitsApi.list(),
           routinesApi.list(),
           goalsApi.list(),
+          goalTasksApi.list(),
           habitLogApi.range(LOG_FROM, LOG_TO),
           routineLogApi.range(LOG_FROM, LOG_TO),
           checkinApi.get(TODAY_ISO),
@@ -127,6 +129,7 @@ export function useAppData() {
           habits,
           routines,
           goals,
+          goalTasks,
           habitLog,
           routineLog,
           checkin: {
@@ -346,6 +349,42 @@ export function useAppData() {
     deleteGoal(id) {
       setState((s) => ({ ...s, goals: s.goals.filter((g) => g.id !== id) }));
       goalsApi.delete(id).catch(console.error);
+    },
+
+    // ---------- GOAL TASKS ----------
+
+    addGoalTask(name) {
+      const tempId = "gt-" + Date.now();
+      const task = { id: tempId, name: name.trim(), done: false };
+      setState((s) => ({ ...s, goalTasks: [...s.goalTasks, task] }));
+      return goalTasksApi.create({ name: name.trim() }).then((created) => {
+        setState((s) => ({
+          ...s,
+          goalTasks: s.goalTasks.map((t) => t.id === tempId ? { ...t, id: created.id, _pageId: created.id } : t),
+        }));
+        return created;
+      });
+    },
+
+    toggleGoalTaskDone(id) {
+      setState((s) => ({
+        ...s,
+        goalTasks: s.goalTasks.map((t) => t.id === id ? { ...t, done: !t.done } : t),
+      }));
+      setStateRaw((s) => {
+        const task = s.goalTasks.find((t) => t.id === id);
+        if (task) goalTasksApi.update(id, { done: !task.done }).catch(console.error);
+        return s;
+      });
+    },
+
+    deleteGoalTask(id) {
+      setState((s) => ({
+        ...s,
+        goalTasks: s.goalTasks.filter((t) => t.id !== id),
+        goals: s.goals.map((g) => ({ ...g, taskIds: (g.taskIds || []).filter((tid) => tid !== id) })),
+      }));
+      goalTasksApi.delete(id).catch(console.error);
     },
 
     // ---------- CHECK-IN ----------

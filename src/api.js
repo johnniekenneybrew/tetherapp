@@ -120,6 +120,16 @@ export const contactGroupsApi = {
 };
 
 // ============================================================
+// Goal tasks (separate from to-do list)
+// ============================================================
+export const goalTasksApi = {
+  list:   ()           => get("/goal-tasks"),
+  create: (data)       => post("/goal-tasks", data),
+  update: (id, patch_) => patch("/goal-tasks", { id, ...patch_ }),
+  delete: (id)         => del("/goal-tasks", { id }),
+};
+
+// ============================================================
 // User preferences (cross-device, Notion-backed)
 // ============================================================
 export const prefsApi = {

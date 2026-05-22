@@ -1,4 +1,5 @@
 import { notion, DB, ACC_MAP, ACC_REVERSE, P, p, queryAll, setCors } from "./_notion.js";
+import { getGoalTasksDbId } from "./_goal-tasks-db.js";
 
 const STATUS_MAP = {
   "in-progress": "In Progress",
@@ -6,38 +7,43 @@ const STATUS_MAP = {
 };
 const STATUS_REVERSE = Object.fromEntries(Object.entries(STATUS_MAP).map(([k, v]) => [v, k]));
 
-// Ensure Goals DB has KPI and Tasks properties (runs once per warm instance)
+// Ensure Goals DB has KPI and GoalTasks properties
 let schemaReady = false;
 async function ensureGoalSchema() {
   if (schemaReady) return;
   try {
-    const db = await notion.databases.retrieve({ database_id: DB.GOALS });
+    const [db, goalTasksDbId] = await Promise.all([
+      notion.databases.retrieve({ database_id: DB.GOALS }),
+      getGoalTasksDbId().catch(() => null),
+    ]);
     const updates = {};
-    if (!db.properties.KPI)   updates.KPI   = { rich_text: {} };
-    if (!db.properties.Tasks) updates.Tasks  = { relation: { database_id: DB.TASKS, single_property: {} } };
+    if (!db.properties.KPI) updates.KPI = { rich_text: {} };
+    if (!db.properties.GoalTasks && goalTasksDbId) {
+      updates.GoalTasks = { relation: { database_id: goalTasksDbId, single_property: {} } };
+    }
     if (Object.keys(updates).length > 0) {
       await notion.databases.update({ database_id: DB.GOALS, properties: updates });
     }
     schemaReady = true;
   } catch (e) {
     console.error("ensureGoalSchema failed", e);
-    schemaReady = true; // don't retry on every request
+    schemaReady = true;
   }
 }
 
 function toGoal(page) {
   const props = page.properties;
   return {
-    _pageId: page.id,
-    id: page.id,
-    name: p.title(props.Name),
+    _pageId:  page.id,
+    id:       page.id,
+    name:     p.title(props.Name),
     description: p.rich(props.Description) || "",
-    kpi: p.rich(props.KPI) || "",
-    status: STATUS_REVERSE[p.select(props.Status)] || "in-progress",
-    account: ACC_REVERSE[p.select(props.Account)] || "personal",
-    target: p.date(props["Target Date"]) || null,
+    kpi:      p.rich(props.KPI) || "",
+    status:   STATUS_REVERSE[p.select(props.Status)] || "in-progress",
+    account:  ACC_REVERSE[p.select(props.Account)] || "personal",
+    target:   p.date(props["Target Date"]) || null,
     habitIds: p.relation(props.Habits),
-    taskIds: p.relation(props.Tasks),
+    taskIds:  p.relation(props.GoalTasks),
   };
 }
 
@@ -65,7 +71,7 @@ export default async function handler(req, res) {
           Account:       P.select(ACC_MAP[account] || "Personal"),
           "Target Date": P.date(target || null),
           Habits:        P.relation(habitIds || []),
-          Tasks:         P.relation(taskIds || []),
+          GoalTasks:     P.relation(taskIds || []),
         },
       });
       return res.json(toGoal(page));
@@ -83,7 +89,7 @@ export default async function handler(req, res) {
       if (patch.account     !== undefined) updates.Account        = P.select(ACC_MAP[patch.account] || "Personal");
       if (patch.target      !== undefined) updates["Target Date"] = P.date(patch.target || null);
       if (patch.habitIds    !== undefined) updates.Habits         = P.relation(patch.habitIds || []);
-      if (patch.taskIds     !== undefined) updates.Tasks          = P.relation(patch.taskIds || []);
+      if (patch.taskIds     !== undefined) updates.GoalTasks      = P.relation(patch.taskIds || []);
 
       const page = await notion.pages.update({ page_id: id, properties: updates });
       return res.json(toGoal(page));

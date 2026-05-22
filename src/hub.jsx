@@ -470,8 +470,8 @@ function GoalsTab({ state, setState, actions }) {
   const active = allActive.filter((g) => accFilter === "all" || g.account === accFilter);
   const done = state.goals.filter((g) => g.status === "completed");
 
-  const habitsById = Object.fromEntries(state.habits.map((h) => [h.id, h]));
-  const todosById  = Object.fromEntries(state.todos.map((t) => [t.id, t]));
+  const habitsById    = Object.fromEntries(state.habits.map((h) => [h.id, h]));
+  const goalTasksById = Object.fromEntries((state.goalTasks || []).map((t) => [t.id, t]));
 
   const completeGoal = (id) => { actions.updateGoal(id, { status: "completed" }); setMenuOpen(null); };
   const delGoal      = (id) => { actions.deleteGoal(id); setMenuOpen(null); };
@@ -567,9 +567,11 @@ function GoalsTab({ state, setState, actions }) {
               <div className="tiny" style={{ color: "var(--text-3)", marginBottom: 5, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>Tasks</div>
               <div className="habit-bubbles">
                 {(g.taskIds || []).map((tid) => {
-                  const task = todosById[tid];
+                  const task = goalTasksById[tid];
                   return (
-                    <span key={tid} className="pill" style={{ textDecoration: task?.done ? "line-through" : "none", opacity: task?.done ? 0.5 : 1 }}>
+                    <span key={tid} className="pill"
+                      style={{ textDecoration: task?.done ? "line-through" : "none", opacity: task?.done ? 0.5 : 1, cursor: "pointer" }}
+                      onClick={() => task && actions.toggleGoalTaskDone(task.id)}>
                       {task?.done && <Icon.Check />}
                       {task?.name || "—"}
                     </span>
@@ -631,16 +633,20 @@ function MenuItem({ children, onClick, destructive }) {
 
 function GoalModal({ goal, onClose, state, actions }) {
   const isEdit = !!goal;
-  const [name, setName]               = useState(goal?.name || "");
-  const [desc, setDesc]               = useState(goal?.description === "—" ? "" : (goal?.description || ""));
-  const [kpi, setKpi]                 = useState(goal?.kpi || "");
-  const [account, setAccount]         = useState(goal?.account || "personal");
-  const [selectedHabits, setHabits]   = useState(goal?.habitIds || []);
-  const [selectedTasks, setTasks]     = useState(goal?.taskIds || []);
+  const [name, setName]       = useState(goal?.name || "");
+  const [desc, setDesc]       = useState(goal?.description === "—" ? "" : (goal?.description || ""));
+  const [kpi, setKpi]         = useState(goal?.kpi || "");
+  const [account, setAccount] = useState(goal?.account || "personal");
+  const [selectedHabits, setHabits] = useState(goal?.habitIds || []);
+  const [selectedTasks, setTasks]   = useState(goal?.taskIds || []);
+
   const [showNewHabit, setShowNewHabit] = useState(false);
   const [newHabitName, setNewHabitName] = useState("");
   const [newHabitTarget, setNewHabitTarget] = useState(5);
-  const [taskSearch, setTaskSearch]   = useState("");
+
+  const [showNewTask, setShowNewTask] = useState(false);
+  const [newTaskName, setNewTaskName] = useState("");
+  const [creatingTask, setCreatingTask] = useState(false);
 
   const toggleHabit = (id) => setHabits((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
   const toggleTask  = (id) => setTasks((s)  => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
@@ -654,13 +660,26 @@ function GoalModal({ goal, onClose, state, actions }) {
     setShowNewHabit(false);
   };
 
+  const createTask = async () => {
+    if (!newTaskName.trim() || creatingTask) return;
+    setCreatingTask(true);
+    try {
+      const created = await actions.addGoalTask(newTaskName.trim());
+      setTasks((s) => [...s, created.id]);
+      setNewTaskName("");
+      setShowNewTask(false);
+    } finally {
+      setCreatingTask(false);
+    }
+  };
+
   const save = () => {
     if (!name.trim()) return;
     const data = {
       name:        name.trim(),
       description: desc.trim() || "",
       kpi:         kpi.trim(),
-      status:      "in-progress",
+      status:      goal?.status || "in-progress",
       account,
       habitIds:    selectedHabits,
       taskIds:     selectedTasks,
@@ -673,17 +692,12 @@ function GoalModal({ goal, onClose, state, actions }) {
     onClose();
   };
 
-  const filteredTodos = state.todos.filter((t) =>
-    !t.done &&
-    (!taskSearch || t.name.toLowerCase().includes(taskSearch.toLowerCase()))
-  );
-
   return (
     <div className="modal-back" onClick={onClose}>
       <div className="modal" style={{ maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
         <h3>{isEdit ? "Edit goal" : "New goal"}</h3>
         <div className="tiny" style={{ marginBottom: 16, color: "var(--text-2)" }}>
-          {isEdit ? "Update your goal details, KPI, and linked habits or tasks." : "Define an outcome, set a KPI, and link what gets you there."}
+          {isEdit ? "Update goal details, KPI, and linked habits or tasks." : "Define an outcome, set a KPI, and link what gets you there."}
         </div>
 
         <div className="field">
@@ -710,13 +724,13 @@ function GoalModal({ goal, onClose, state, actions }) {
             {ACCOUNTS.map((a) => (
               <button key={a.id} className={"acc-chip" + (account === a.id ? " is-on" : "")}
                 onClick={() => setAccount(a.id)}>
-                <AccountDot acc={a.id} />
-                <span>{a.name}</span>
+                <AccountDot acc={a.id} /><span>{a.name}</span>
               </button>
             ))}
           </div>
         </div>
 
+        {/* Habits — recurring weekly */}
         <div className="field">
           <label>Link habits <span style={{ fontWeight: 400, color: "var(--text-3)" }}>— recurring weekly activities</span></label>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -742,8 +756,7 @@ function GoalModal({ goal, onClose, state, actions }) {
           {showNewHabit && (
             <div className="fade-in" style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center" }}>
               <input className="input" style={{ flex: 1 }} placeholder="Habit name"
-                value={newHabitName}
-                onChange={(e) => setNewHabitName(e.target.value)}
+                value={newHabitName} onChange={(e) => setNewHabitName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") createHabit(); if (e.key === "Escape") setShowNewHabit(false); }}
                 autoFocus />
               <select className="btn" style={{ fontSize: 12 }} value={newHabitTarget}
@@ -756,21 +769,11 @@ function GoalModal({ goal, onClose, state, actions }) {
           )}
         </div>
 
+        {/* Tasks — one-off actions */}
         <div className="field">
           <label>Link tasks <span style={{ fontWeight: 400, color: "var(--text-3)" }}>— one-off actions that move this forward</span></label>
-          {state.todos.filter((t) => !t.done).length > 5 && (
-            <input className="input" style={{ marginBottom: 8, fontSize: 13 }}
-              placeholder="Search tasks…"
-              value={taskSearch}
-              onChange={(e) => setTaskSearch(e.target.value)} />
-          )}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {filteredTodos.length === 0 && (
-              <span className="tiny" style={{ color: "var(--text-3)" }}>
-                {taskSearch ? "No tasks match" : "No open tasks — add some in the To-Do list"}
-              </span>
-            )}
-            {filteredTodos.map((t) => {
+            {state.goalTasks.map((t) => {
               const on = selectedTasks.includes(t.id);
               return (
                 <button key={t.id} className="pill"
@@ -778,16 +781,30 @@ function GoalModal({ goal, onClose, state, actions }) {
                     background: on ? "var(--text)" : "var(--surface-2)",
                     color: on ? "#fff" : "var(--text)",
                     borderColor: on ? "var(--text)" : "var(--border-soft)",
+                    textDecoration: t.done ? "line-through" : "none",
+                    opacity: t.done && !on ? 0.5 : 1,
                   }}
                   onClick={() => toggleTask(t.id)}>
                   {on && <Icon.Check />} {t.name}
                 </button>
               );
             })}
+            <button className="pill" style={{ borderStyle: "dashed", color: "var(--text-2)" }}
+              onClick={() => setShowNewTask(true)}>
+              <Icon.Plus /> New task
+            </button>
           </div>
-          {selectedTasks.filter((id) => !filteredTodos.find((t) => t.id === id)).length > 0 && (
-            <div className="tiny" style={{ marginTop: 6, color: "var(--text-3)" }}>
-              + {selectedTasks.filter((id) => !filteredTodos.find((t) => t.id === id)).length} completed task(s) linked
+          {showNewTask && (
+            <div className="fade-in" style={{ display: "flex", gap: 8, marginTop: 10, alignItems: "center" }}>
+              <input className="input" style={{ flex: 1 }} placeholder="Task name"
+                value={newTaskName} onChange={(e) => setNewTaskName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") createTask(); if (e.key === "Escape") setShowNewTask(false); }}
+                autoFocus />
+              <button className="btn btn-primary" onClick={createTask}
+                disabled={!newTaskName.trim() || creatingTask}>
+                {creatingTask ? "Adding…" : "Add"}
+              </button>
+              <button className="btn-text" onClick={() => setShowNewTask(false)}><Icon.X /></button>
             </div>
           )}
         </div>
