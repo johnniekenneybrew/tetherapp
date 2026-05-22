@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useUser, useClerk } from '@clerk/clerk-react';
 
 export { useState, useEffect, useRef, useMemo };
 
@@ -134,6 +135,12 @@ export function TopBar({ route, setRoute, dateLabel, onHubTab }) {
   const [dropOpen, setDropOpen] = useState(null);
   const menuTimer = useRef(null);
   const dropTimer = useRef(null);
+  const { user } = useUser();
+  const { signOut } = useClerk();
+
+  const fullName = user?.fullName || user?.firstName || "Account";
+  const email = user?.primaryEmailAddress?.emailAddress || "";
+  const initials = fullName.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 
   const items = [
     { id: "checkin", label: "Daily Check-In" },
@@ -246,13 +253,13 @@ export function TopBar({ route, setRoute, dateLabel, onHubTab }) {
               className={"avatar" + (route.page === "settings" ? " is-active" : "")}
               aria-expanded={menuOpen}
               title="Account">
-              JM
+              {initials}
             </button>
             {menuOpen && (
               <div className="avatar-menu fade-in">
                 <div className="avatar-menu-head">
-                  <div style={{ fontWeight: 600, fontSize: 13.5 }}>Jordan Mason</div>
-                  <div className="tiny" style={{ marginTop: 2 }}>j@getro.com</div>
+                  <div style={{ fontWeight: 600, fontSize: 13.5 }}>{fullName}</div>
+                  {email && <div className="tiny" style={{ marginTop: 2 }}>{email}</div>}
                 </div>
                 <div className="avatar-menu-list">
                   <button onClick={() => { setRoute({ page: "settings" }); setMenuOpen(false); }}>
@@ -267,7 +274,7 @@ export function TopBar({ route, setRoute, dateLabel, onHubTab }) {
                 </div>
                 <div className="avatar-menu-divider" />
                 <div className="avatar-menu-list">
-                  <button onClick={() => setMenuOpen(false)} style={{ color: "var(--text-2)" }}>
+                  <button onClick={() => signOut()} style={{ color: "var(--text-2)" }}>
                     <SignOutIcon /> Sign out
                   </button>
                 </div>

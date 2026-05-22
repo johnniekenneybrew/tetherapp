@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { SignIn, SignedIn, SignedOut } from '@clerk/clerk-react';
 import { ACCOUNTS, TODAY, fmtShort, TopBar } from './shared';
 import { DailyCheckIn } from './checkin';
 import { TodoList } from './todo';
@@ -10,7 +11,7 @@ import { useAppData } from './useAppData';
 // App
 // ============================================================
 
-export default function App() {
+function AuthedApp() {
   const { state, setState, loading, error, actions } = useAppData();
   const [route, setRoute] = useState({ page: "checkin" });
   const [hubSub, setHubSub] = useState("habits");
@@ -72,5 +73,23 @@ export default function App() {
         <SocialPage state={state} setState={setState} actions={actions} />
       )}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <>
+      <SignedIn>
+        <AuthedApp />
+      </SignedIn>
+      <SignedOut>
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
+          minHeight: "100vh", background: "var(--bg)",
+        }}>
+          <SignIn routing="hash" />
+        </div>
+      </SignedOut>
+    </>
   );
 }
