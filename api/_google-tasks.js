@@ -10,6 +10,8 @@ let _tokenExpiry  = 0;
 let _refreshToken = null;
 
 export async function getRefreshToken() {
+  // Env var takes priority — no Notion call needed if set
+  if (process.env.GOOGLE_REFRESH_TOKEN) return process.env.GOOGLE_REFRESH_TOKEN;
   if (_refreshToken) return _refreshToken;
   _refreshToken = await getPref("google-refresh-token", "_system");
   return _refreshToken;
@@ -72,8 +74,20 @@ async function gtFetch(method, path, body) {
   return res.json();
 }
 
-export async function gtCreate(title) {
-  return gtFetch("POST", "/lists/@default/tasks", { title, status: "needsAction" });
+// isoToGoogleDue: "2024-01-15" → "2024-01-15T00:00:00.000Z" (Google requires RFC 3339)
+export function isoToGoogleDue(iso) {
+  return iso ? `${iso}T00:00:00.000Z` : undefined;
+}
+// googleDueToIso: "2024-01-15T00:00:00.000Z" → "2024-01-15"
+export function googleDueToIso(due) {
+  return due ? due.slice(0, 10) : null;
+}
+
+export async function gtCreate(title, { notes, due } = {}) {
+  const body = { title, status: "needsAction" };
+  if (notes) body.notes = notes;
+  if (due)   body.due   = isoToGoogleDue(due);
+  return gtFetch("POST", "/lists/@default/tasks", body);
 }
 
 export async function gtUpdate(googleId, patch) {

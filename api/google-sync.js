@@ -1,5 +1,5 @@
 import { notion, DB, P, p, queryAll, setCors } from "./_notion.js";
-import { isConnected, clearRefreshToken, gtCreate, gtUpdate, gtDelete, gtListAll } from "./_google-tasks.js";
+import { isConnected, clearRefreshToken, gtCreate, gtUpdate, gtDelete, gtListAll, isoToGoogleDue, googleDueToIso } from "./_google-tasks.js";
 
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
 
@@ -44,16 +44,18 @@ export async function runSync() {
 
   const ops = [];
 
-  // ── Notion → Google: ensure every Notion task exists in Google ──
+  // ── Notion → Google: Notion is source of truth for content ──────────────────
   for (const pg of notionTasks) {
-    const gid   = p.rich(pg.properties["Google Task ID"]);
-    const title = p.title(pg.properties.Title);
-    const done  = p.checkbox(pg.properties.Done);
+    const gid     = p.rich(pg.properties["Google Task ID"]);
+    const title   = p.title(pg.properties.Title);
+    const done    = p.checkbox(pg.properties.Done);
+    const notes   = p.rich(pg.properties.Details) || "";
+    const dueISO  = p.date(pg.properties["Due Date"]) || null;
 
     if (!gid) {
-      // New in Notion, not yet in Google — create it
+      // New in Notion — create in Google with all fields
       ops.push(
-        gtCreate(title).then((gt) =>
+        gtCreate(title, { notes: notes || undefined, due: dueISO }).then((gt) =>
           notion.pages.update({
             page_id: pg.id,
             properties: { "Google Task ID": P.rich(gt.id) },
@@ -61,15 +63,18 @@ export async function runSync() {
         ).catch(console.error)
       );
     } else if (googleById[gid]) {
-      // Exists in both — sync completion status: Notion wins
-      const gtDone = googleById[gid].status === "completed";
-      if (done !== gtDone) {
-        ops.push(
-          gtUpdate(gid, { status: done ? "completed" : "needsAction" }).catch(console.error)
-        );
+      // Exists in both — push any Notion changes to Google
+      const gt = googleById[gid];
+      const patch = {};
+      if (title !== (gt.title || ""))                   patch.title  = title;
+      if (notes !== (gt.notes || ""))                   patch.notes  = notes;
+      if (dueISO !== googleDueToIso(gt.due))            patch.due    = dueISO ? isoToGoogleDue(dueISO) : null;
+      if (done  !== (gt.status === "completed"))        patch.status = done ? "completed" : "needsAction";
+      if (Object.keys(patch).length > 0) {
+        ops.push(gtUpdate(gid, patch).catch(console.error));
       }
     }
-    // If gid exists but Google doesn't have it → task was deleted in Google, handled below
+    // If gid set but Google no longer has it → deleted in Google, handled below
   }
 
   // ── Google → Notion: handle new/deleted/completed tasks from Google ──
@@ -87,10 +92,11 @@ export async function runSync() {
     }
 
     if (!notionPg) {
-      // New task in Google (added on phone / another client) → create in Notion
+      // New task in Google → create in Notion with all available fields
       const title = gt.title?.trim();
       if (!title) continue;
-      const done = gt.status === "completed";
+      const done   = gt.status === "completed";
+      const dueISO = googleDueToIso(gt.due);
       ops.push(
         notion.pages.create({
           parent: { database_id: DB.TASKS },
@@ -99,19 +105,18 @@ export async function runSync() {
             Done:             P.checkbox(done),
             Account:          P.select("Getro"),
             Priority:         P.checkbox(false),
-            Details:          P.rich(""),
-            "Due Date":       P.date(null),
+            Details:          P.rich(gt.notes || ""),
+            "Due Date":       P.date(dueISO),
             "Google Task ID": P.rich(gt.id),
             ...(done ? { "Completed Date": P.date(TODAY_ISO) } : {}),
           },
         }).catch(console.error)
       );
     } else {
-      // Exists in both — sync completion status: Google wins for changes originating there
+      // Exists in both — Google completion wins; Notion wins for everything else
       const ntDone = p.checkbox(notionPg.properties.Done);
       const gtDone = gt.status === "completed";
       if (gtDone && !ntDone) {
-        // Completed in Google → mark done in Notion
         ops.push(
           notion.pages.update({
             page_id: notionPg.id,
