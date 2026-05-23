@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useUser } from '@clerk/clerk-react';
-import { TODAY, addDays, weekStart } from './shared';
+import { TODAY, addDays, weekStart, showToast } from './shared';
 import {
   tasksApi, checkinApi, habitsApi, habitLogApi,
   routinesApi, routineLogApi, goalsApi, goalTasksApi,
@@ -197,14 +197,13 @@ export function useAppData() {
     // ---------- TASKS ----------
 
     addTodo(todo) {
-      // Optimistic: already has temp id from caller
       setState((s) => ({ ...s, todos: [todo, ...s.todos] }));
       tasksApi.create(todo).then((created) => {
-        // Replace temp id with real Notion page id
         setState((s) => ({
           ...s,
           todos: s.todos.map((t) => t.id === todo.id ? { ...t, id: created.id, _pageId: created.id } : t),
         }));
+        showToast("Task saved");
       }).catch(console.error);
     },
 
@@ -228,12 +227,12 @@ export function useAppData() {
 
     updateTodo(id, patch) {
       setState((s) => ({ ...s, todos: s.todos.map((t) => t.id === id ? { ...t, ...patch } : t) }));
-      tasksApi.update(id, patch).catch(console.error);
+      tasksApi.update(id, patch).then(() => showToast("Saved")).catch(console.error);
     },
 
     deleteTodo(id) {
       setState((s) => ({ ...s, todos: s.todos.filter((t) => t.id !== id) }));
-      tasksApi.delete(id).catch(console.error);
+      tasksApi.delete(id).then(() => showToast("Deleted")).catch(console.error);
     },
 
     addSubtask(todoId, text) {
@@ -403,7 +402,7 @@ export function useAppData() {
     updateCheckin(patch) {
       setState((s) => ({ ...s, checkin: { ...s.checkin, ...patch } }));
       if (checkinPageId) {
-        checkinApi.update(checkinPageId, patch).catch(console.error);
+        checkinApi.update(checkinPageId, patch).then(() => showToast("Saved")).catch(console.error);
       }
     },
 
@@ -414,12 +413,12 @@ export function useAppData() {
         ...s,
         contacts: s.contacts.map((c) => c.id === id ? { ...c, ...patch } : c),
       }));
-      contactsApi.update(id, patch).catch(console.error);
+      contactsApi.update(id, patch).then(() => showToast("Saved")).catch(console.error);
     },
 
     deleteContact(id) {
       setState((s) => ({ ...s, contacts: s.contacts.filter((c) => c.id !== id) }));
-      contactsApi.delete(id).catch(console.error);
+      contactsApi.delete(id).then(() => showToast("Deleted")).catch(console.error);
     },
 
     addContact(contact) {
@@ -431,6 +430,7 @@ export function useAppData() {
           ...s,
           contacts: s.contacts.map((c) => c.id === tempId ? { ...c, id: created.id, _pageId: created.id } : c),
         }));
+        showToast("Contact saved");
       }).catch(console.error);
     },
 
@@ -454,6 +454,7 @@ export function useAppData() {
                 : c
             ),
           }));
+          showToast("Note saved");
         }).catch(console.error);
     },
 
@@ -466,7 +467,7 @@ export function useAppData() {
             : c
         ),
       }));
-      contactNotesApi.delete(noteId).catch(console.error);
+      contactNotesApi.delete(noteId).then(() => showToast("Deleted")).catch(console.error);
     },
 
     // ---------- GOOGLE TASKS ----------

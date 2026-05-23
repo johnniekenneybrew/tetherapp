@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { SignIn, SignedIn, SignedOut } from '@clerk/clerk-react';
-import { ACCOUNTS, TODAY, fmtShort, TopBar } from './shared';
+import { ACCOUNTS, TODAY, fmtShort, TopBar, _registerToastHandler } from './shared';
 import { DailyCheckIn } from './checkin';
 import { TodoList } from './todo';
 import { HabitsHub, SettingsTab } from './hub';
@@ -18,6 +18,17 @@ function AuthedApp() {
   const [route, setRoute] = useState({ page: "checkin" });
   const [hubSub, setHubSub] = useState("habits");
   const [oauthBanner, setOauthBanner] = useState(null);
+  const [toast, setToast] = useState(null);
+  const toastTimer = useRef(null);
+
+  // Register global toast handler
+  useEffect(() => {
+    _registerToastHandler((msg) => {
+      clearTimeout(toastTimer.current);
+      setToast(msg);
+      toastTimer.current = setTimeout(() => setToast(null), 2200);
+    });
+  }, []);
 
   const dateLabel = fmtShort(TODAY).split(", ")[1];
   const navigateTo = (r) => setRoute(r);
@@ -104,6 +115,14 @@ function AuthedApp() {
             marginLeft: 16, background: "none", border: "none", color: "#fff",
             cursor: "pointer", fontSize: 14, fontWeight: 700,
           }}>✕</button>
+        </div>
+      )}
+      {toast && (
+        <div className="toast">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <path d="M2 6.5l3.5 3.5 5.5-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          {toast}
         </div>
       )}
       <TopBar route={route} setRoute={setRoute} dateLabel={dateLabel} onHubTab={{ current: hubSub, set: setHubSub }} />

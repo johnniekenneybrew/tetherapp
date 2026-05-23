@@ -4,6 +4,14 @@ import { useUser, useClerk } from '@clerk/clerk-react';
 export { useState, useEffect, useRef, useMemo };
 
 // ============================================================
+// Toast (module-level singleton so any action can fire it)
+// ============================================================
+
+let _toastHandler = null;
+export function _registerToastHandler(fn) { _toastHandler = fn; }
+export function showToast(msg = "Saved") { _toastHandler?.(msg); }
+
+// ============================================================
 // Shared primitives + data helpers
 // ============================================================
 
