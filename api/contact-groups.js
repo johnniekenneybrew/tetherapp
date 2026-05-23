@@ -115,14 +115,15 @@ export default async function handler(req, res) {
     if (req.method === "POST") {
       const { name, icon } = req.body;
       const created = await createContactGroup(name);
-      const resourceName = created.contactGroup?.resourceName || "";
+      // Google returns the ContactGroup directly (not wrapped in contactGroup)
+      const resourceName = created.resourceName || "";
 
       // Save icon to Notion
       if (icon) {
         await saveIconToNotion(resourceName, name, icon);
       }
 
-      return res.json(toGroup(created.contactGroup));
+      return res.json(toGroup(created));
     }
 
     if (req.method === "PATCH") {

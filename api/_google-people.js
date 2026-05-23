@@ -95,29 +95,32 @@ export async function listContacts() {
 
 // Get single contact
 export async function getContact(resourceName) {
+  // resourceName is already "people/cXXX" — use as-is
   const personFields = [
     "names", "phoneNumbers", "emailAddresses", "birthdays",
     "addresses", "relations", "userDefined", "memberships"
   ].join(",");
 
-  return peopleFetch("GET", `/people/${resourceName}?personFields=${personFields}`);
+  return peopleFetch("GET", `/${resourceName}?personFields=${personFields}`);
 }
 
 // Create contact
 export async function createContact(personData) {
-  return peopleFetch("POST", "/people:createContact", { names: personData.names || [] });
+  return peopleFetch("POST", "/people:createContact", personData);
 }
 
 // Update contact
 export async function updateContact(resourceName, personData) {
-  const updatePersonFields = Object.keys(personData).join(",");
-  const path = `/people/${resourceName}:updateContact?updatePersonFields=${updatePersonFields}`;
+  // Only include fields set by toGooglePerson
+  const updatePersonFields = "names,emailAddresses,phoneNumbers,addresses,birthdays,userDefined";
+  const path = `/${resourceName}:updateContact?updatePersonFields=${updatePersonFields}`;
   return peopleFetch("PATCH", path, personData);
 }
 
 // Delete contact
 export async function deleteContact(resourceName) {
-  return peopleFetch("DELETE", `/people/${resourceName}`);
+  // resourceName is already "people/cXXX"
+  return peopleFetch("DELETE", `/${resourceName}`);
 }
 
 // List contact groups
@@ -135,29 +138,29 @@ export async function createContactGroup(groupName) {
 
 // Update contact group
 export async function updateContactGroup(resourceName, groupName) {
-  const path = `/contactGroups/${encodeURIComponent(resourceName)}?updateGroupFields=name`;
-  return peopleFetch("PATCH", path, {
+  // resourceName is already "contactGroups/XXX" — use as-is
+  return peopleFetch("PATCH", `/${resourceName}?updateGroupFields=name`, {
     contactGroup: { resourceName, name: groupName }
   });
 }
 
 // Delete contact group
 export async function deleteContactGroup(resourceName) {
-  return peopleFetch("DELETE", `/contactGroups/${encodeURIComponent(resourceName)}`);
+  // resourceName is already "contactGroups/XXX"
+  return peopleFetch("DELETE", `/${resourceName}`);
 }
 
 // Add contact to group
 export async function addContactToGroup(contactResourceName, groupResourceName) {
-  const path = `/contactGroups/${encodeURIComponent(groupResourceName)}/members:modify`;
-  return peopleFetch("POST", path, {
+  // groupResourceName is already "contactGroups/XXX"
+  return peopleFetch("POST", `/${groupResourceName}/members:modify`, {
     resourceNamesToAdd: [contactResourceName]
   });
 }
 
 // Remove contact from group
 export async function removeContactFromGroup(contactResourceName, groupResourceName) {
-  const path = `/contactGroups/${encodeURIComponent(groupResourceName)}/members:modify`;
-  return peopleFetch("POST", path, {
+  return peopleFetch("POST", `/${groupResourceName}/members:modify`, {
     resourceNamesToRemove: [contactResourceName]
   });
 }
