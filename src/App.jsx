@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SignIn, SignedIn, SignedOut } from '@clerk/clerk-react';
 import { ACCOUNTS, TODAY, fmtShort, TopBar, _registerToastHandler } from './shared';
 import { DailyCheckIn } from './checkin';
