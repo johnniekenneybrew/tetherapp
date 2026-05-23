@@ -77,17 +77,19 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "POST") {
-      const { title, account, done, priority, details, due } = req.body;
+      const { title, account, done, priority, details, due, parentId } = req.body;
+      const properties = {
+        Title:      P.title(title),
+        Account:    P.select(ACC_MAP[account] || "Personal"),
+        Done:       P.checkbox(done ?? false),
+        Priority:   P.checkbox(priority ?? false),
+        Details:    P.rich(details || ""),
+        "Due Date": P.date(dueToIso(due)),
+      };
+      if (parentId) properties["Parent Task"] = P.relation([parentId]);
       const page = await notion.pages.create({
         parent: { database_id: DB.TASKS },
-        properties: {
-          Title:      P.title(title),
-          Account:    P.select(ACC_MAP[account] || "Personal"),
-          Done:       P.checkbox(done ?? false),
-          Priority:   P.checkbox(priority ?? false),
-          Details:    P.rich(details || ""),
-          "Due Date": P.date(dueToIso(due)),
-        },
+        properties,
       });
       const t = toTask(page, {});
       delete t._parentIds;

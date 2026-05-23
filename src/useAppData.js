@@ -237,18 +237,31 @@ export function useAppData() {
 
     addSubtask(todoId, text) {
       if (!text.trim()) return;
-      const sub = { id: Date.now(), text: text.trim(), done: false };
+      const tempId = "sub-" + Date.now();
+      const sub = { id: tempId, text: text.trim(), done: false };
       setState((s) => ({
         ...s,
         todos: s.todos.map((t) =>
           t.id === todoId ? { ...t, subtasks: [...t.subtasks, sub] } : t
         ),
       }));
-      const todo = state.todos.find((t) => t.id === todoId);
-      if (todo) {
-        const newSubs = [...todo.subtasks, sub];
-        tasksApi.update(todoId, { subtasks: newSubs }).catch(console.error);
-      }
+      const parent = state.todos.find((t) => t.id === todoId);
+      tasksApi.create({
+        title: text.trim(),
+        account: parent?.account || "personal",
+        done: false,
+        priority: false,
+        parentId: todoId,
+      }).then((created) => {
+        setState((s) => ({
+          ...s,
+          todos: s.todos.map((t) =>
+            t.id === todoId
+              ? { ...t, subtasks: t.subtasks.map((st) => st.id === tempId ? { ...st, id: created.id } : st) }
+              : t
+          ),
+        }));
+      }).catch(console.error);
     },
 
     toggleSubtask(todoId, subId) {
@@ -260,11 +273,11 @@ export function useAppData() {
             : t
         ),
       }));
+      // Find the new done value from the just-updated state
       setStateRaw((s) => {
         const todo = s.todos.find((t) => t.id === todoId);
-        if (todo) {
-          tasksApi.update(todoId, { subtasks: todo.subtasks }).catch(console.error);
-        }
+        const sub  = todo?.subtasks.find((st) => st.id === subId);
+        if (sub) tasksApi.update(subId, { done: sub.done }).catch(console.error);
         return s;
       });
     },
