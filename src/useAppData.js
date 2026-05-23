@@ -104,9 +104,9 @@ export function useAppData() {
           habitLogApi.range(LOG_FROM, LOG_TO),
           routineLogApi.range(LOG_FROM, LOG_TO),
           checkinApi.get(TODAY_ISO),
-          contactsApi.list(),
-          contactGroupsApi.list(),
-          contactNotesApi.forContact(""), // loads all notes
+          contactsApi.list().catch(() => []),
+          contactGroupsApi.list().catch(() => []),
+          contactNotesApi.forContact("").catch(() => []), // loads all notes
         ]);
 
         // Attach notes to contacts
