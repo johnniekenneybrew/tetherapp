@@ -22,8 +22,8 @@ function toContact(googlePerson) {
     email: emails[0]?.value || "",
     phone: phones[0]?.value || "",
     city: addresses[0]?.city || "",
-    birthday: birthdays[0]?.date?.year && birthdays[0]?.date?.month && birthdays[0]?.date?.day
-      ? `${birthdays[0].date.year}-${String(birthdays[0].date.month).padStart(2, "0")}-${String(birthdays[0].date.day).padStart(2, "0")}`
+    birthday: birthdays[0]?.date?.month && birthdays[0]?.date?.day
+      ? `${birthdays[0].date.year || "0000"}-${String(birthdays[0].date.month).padStart(2, "0")}-${String(birthdays[0].date.day).padStart(2, "0")}`
       : null,
     groups: memberships
       .filter(m => !m.contactGroupMembership?.contactGroupResourceName?.includes("myContacts"))
@@ -70,8 +70,14 @@ function toGooglePerson(contact, existingPerson = null) {
 
   // Birthday (YYYY-MM-DD format)
   if (contact.birthday) {
-    const [year, month, day] = contact.birthday.split("-").map(Number);
-    person.birthdays = [{ date: { year, month, day } }];
+    const parts = contact.birthday.split("-").map(Number);
+    if (parts.length === 3) {
+      person.birthdays = [{ date: {
+        year: parts[0] || undefined,
+        month: parts[1],
+        day: parts[2]
+      } }];
+    }
   }
 
   // Custom fields
