@@ -89,7 +89,7 @@ function toGroup(googleGroup) {
   const resourceName = googleGroup.resourceName || "";
   return {
     id: resourceName,
-    name: googleGroup.formattedName || "",
+    name: googleGroup.name || googleGroup.formattedName || "",
     icon: iconCache[resourceName] || "👥",
   };
 }

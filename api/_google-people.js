@@ -122,22 +122,22 @@ export async function deleteContact(resourceName) {
 
 // List contact groups
 export async function listContactGroups() {
-  const data = await peopleFetch("GET", "/contactGroups?groupFields=metadata,formattedName");
+  const data = await peopleFetch("GET", "/contactGroups?groupFields=metadata,name");
   return data.contactGroups || [];
 }
 
 // Create contact group
-export async function createContactGroup(name) {
+export async function createContactGroup(groupName) {
   return peopleFetch("POST", "/contactGroups", {
-    contactGroup: { formattedName: name }
+    contactGroup: { name: groupName }
   });
 }
 
 // Update contact group
-export async function updateContactGroup(resourceName, name) {
-  const path = `/contactGroups/${encodeURIComponent(resourceName)}?updateGroupFields=formattedName`;
+export async function updateContactGroup(resourceName, groupName) {
+  const path = `/contactGroups/${encodeURIComponent(resourceName)}?updateGroupFields=name`;
   return peopleFetch("PATCH", path, {
-    contactGroup: { resourceName, formattedName: name }
+    contactGroup: { resourceName, name: groupName }
   });
 }
 
