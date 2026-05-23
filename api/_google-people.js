@@ -67,6 +67,7 @@ async function peopleFetch(method, path, body) {
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   if (res.status === 204 || res.status === 200 && method === "DELETE") return null;
+  if (res.status === 404 && method === "DELETE") return null; // Already deleted, treat as success
   if (!res.ok) { const e = await res.text(); throw new Error(`Google People ${method} ${path}: ${e}`); }
   return res.json();
 }
