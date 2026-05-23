@@ -472,7 +472,7 @@ export function useAppData() {
             : c
         ),
       }));
-      contactNotesApi.delete(noteId).then(() => showToast("Deleted")).catch(console.error);
+      contactNotesApi.delete(noteId, contactId).then(() => showToast("Deleted")).catch(console.error);
     },
 
 

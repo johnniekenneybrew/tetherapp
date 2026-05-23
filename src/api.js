@@ -106,7 +106,7 @@ export const contactsApi = {
 export const contactNotesApi = {
   forContact: (contactId) => get("/contact-notes", { contactId }),
   create:     (data)      => post("/contact-notes", data),
-  delete:     (id)        => del("/contact-notes", { id }),
+  delete:     (id, contactId) => del("/contact-notes", { id, contactId }),
 };
 
 // ============================================================

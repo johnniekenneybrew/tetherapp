@@ -1,48 +1,88 @@
-import { notion, DB, P, p, queryAll, setCors } from "./_notion.js";
+import {
+  listContacts, getContact, createContact, updateContact, deleteContact,
+  listContactGroups, addContactToGroup, removeContactFromGroup,
+  getCustomField, setCustomField, isConnected
+} from "./_google-people.js";
+import { setCors } from "./_notion.js";
 
-// Auto-add new properties on first call
-let schemaReady = false;
-async function ensureContactSchema() {
-  if (schemaReady) return;
-  try {
-    const db = await notion.databases.retrieve({ database_id: DB.CONTACTS });
-    const updates = {};
-    if (!db.properties.From)              updates.From              = { rich_text: {} };
-    if (!db.properties.Context)           updates.Context           = { rich_text: {} };
-    if (!db.properties["Linked Contacts"]) updates["Linked Contacts"] = { rich_text: {} };
-    if (!db.properties["Introduced By"]) updates["Introduced By"]  = { rich_text: {} };
-    if (Object.keys(updates).length > 0) {
-      await notion.databases.update({ database_id: DB.CONTACTS, properties: updates });
-    }
-    schemaReady = true;
-  } catch (e) {
-    console.error("ensureContactSchema failed", e);
-    schemaReady = true;
-  }
-}
+function toContact(googlePerson) {
+  const names = googlePerson.names || [];
+  const emails = googlePerson.emailAddresses || [];
+  const phones = googlePerson.phoneNumbers || [];
+  const addresses = googlePerson.addresses || [];
+  const birthdays = googlePerson.birthdays || [];
+  const relations = googlePerson.relations || [];
+  const memberships = googlePerson.memberships || [];
+  const userDefined = googlePerson.userDefined || [];
 
-function parseLinked(raw) {
-  try { return JSON.parse(raw || "[]"); } catch { return []; }
-}
-
-function toContact(page) {
-  const props = page.properties;
   return {
-    _pageId:        page.id,
-    id:             page.id,
-    name:           p.title(props.Name),
-    from:           p.rich(props.From) || "",
-    city:           p.rich(props.City) || "",
-    birthday:       p.date(props.Birthday) || null,
-    groups:         p.relation(props.Group),
-    lastSeen:       p.rich(props["Last Seen"]) || "",
-    giftIdeas:      p.rich(props["Gift Ideas"]) || "",
-    tags:           p.mselect(props.Tags),
-    context:        p.rich(props.Context) || "",
-    linkedContacts: parseLinked(p.rich(props["Linked Contacts"])),
-    introducedBy:   p.rich(props["Introduced By"]) || "",
+    _googleId: googlePerson.resourceName,
+    id: googlePerson.resourceName,
+    name: names[0]?.displayName || "",
+    email: emails[0]?.value || "",
+    phone: phones[0]?.value || "",
+    city: addresses[0]?.city || "",
+    birthday: birthdays[0]?.date?.year && birthdays[0]?.date?.month && birthdays[0]?.date?.day
+      ? `${birthdays[0].date.year}-${String(birthdays[0].date.month).padStart(2, "0")}-${String(birthdays[0].date.day).padStart(2, "0")}`
+      : null,
+    groups: memberships
+      .filter(m => !m.contactGroupMembership?.contactGroupResourceName?.includes("myContacts"))
+      .map(m => m.contactGroupMembership?.contactGroupResourceName || ""),
+    linkedContacts: relations.map(r => ({
+      id: r.person?.resourceName || "",
+      name: r.person?.names?.[0]?.displayName || "",
+      relationship: r.relationshipType || "other"
+    })),
+    from: getCustomField(userDefined, "from") || "",
+    lastSeen: getCustomField(userDefined, "lastSeen") || "",
+    giftIdeas: getCustomField(userDefined, "giftIdeas") || "",
+    context: getCustomField(userDefined, "context") || "",
+    introducedBy: getCustomField(userDefined, "introducedBy") || "",
+    tags: [],
     notes: [],
   };
+}
+
+function toGooglePerson(contact, existingPerson = null) {
+  const person = existingPerson || {};
+
+  // Names
+  person.names = [{
+    displayName: contact.name || "",
+    givenName: contact.name?.split(" ")[0] || "",
+    familyName: contact.name?.split(" ").slice(1).join(" ") || "",
+  }];
+
+  // Email
+  if (contact.email) {
+    person.emailAddresses = [{ value: contact.email, type: "work" }];
+  }
+
+  // Phone
+  if (contact.phone) {
+    person.phoneNumbers = [{ value: contact.phone, type: "mobile" }];
+  }
+
+  // Address (city)
+  if (contact.city) {
+    person.addresses = [{ city: contact.city, type: "work" }];
+  }
+
+  // Birthday (YYYY-MM-DD format)
+  if (contact.birthday) {
+    const [year, month, day] = contact.birthday.split("-").map(Number);
+    person.birthdays = [{ date: { year, month, day } }];
+  }
+
+  // Custom fields
+  person.userDefined = existingPerson?.userDefined || [];
+  person.userDefined = setCustomField(person.userDefined, "from", contact.from || null);
+  person.userDefined = setCustomField(person.userDefined, "lastSeen", contact.lastSeen || null);
+  person.userDefined = setCustomField(person.userDefined, "giftIdeas", contact.giftIdeas || null);
+  person.userDefined = setCustomField(person.userDefined, "context", contact.context || null);
+  person.userDefined = setCustomField(person.userDefined, "introducedBy", contact.introducedBy || null);
+
+  return person;
 }
 
 export default async function handler(req, res) {
@@ -50,59 +90,64 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
 
   try {
-    await ensureContactSchema();
+    const connected = await isConnected();
+    if (!connected) return res.status(401).json({ error: "Google Contacts not connected" });
 
     if (req.method === "GET") {
-      const pages = await queryAll(DB.CONTACTS);
-      return res.json(pages.map(toContact));
+      const people = await listContacts();
+      return res.json(people.map(toContact));
     }
 
     if (req.method === "POST") {
-      const { name, from, city, birthday, groups, lastSeen, giftIdeas, tags, context, linkedContacts, introducedBy } = req.body;
-      const page = await notion.pages.create({
-        parent: { database_id: DB.CONTACTS },
-        properties: {
-          Name:               P.title(name),
-          From:               P.rich(from || ""),
-          City:               P.rich(city || ""),
-          Birthday:           P.date(birthday || null),
-          Group:              P.relation(groups || []),
-          "Last Seen":        P.rich(lastSeen || ""),
-          "Gift Ideas":       P.rich(giftIdeas || ""),
-          Tags:               P.mselect(tags || []),
-          Context:            P.rich(context || ""),
-          "Linked Contacts":  P.rich(JSON.stringify(linkedContacts || [])),
-          "Introduced By":    P.rich(introducedBy || ""),
-        },
-      });
-      return res.json(toContact(page));
+      const { name, email, phone, city, birthday, groups, from, lastSeen, giftIdeas, context, introducedBy } = req.body;
+      const contactData = { name, email, phone, city, birthday, from, lastSeen, giftIdeas, context, introducedBy };
+      const googlePerson = toGooglePerson(contactData);
+
+      const created = await createContact(googlePerson);
+      const contact = toContact(created);
+
+      // Add to groups
+      if (groups && groups.length > 0) {
+        for (const groupId of groups) {
+          await addContactToGroup(contact.id, groupId).catch(() => {});
+        }
+      }
+
+      return res.json(contact);
     }
 
     if (req.method === "PATCH") {
       const { id, ...patch } = req.body;
       if (!id) return res.status(400).json({ error: "id required" });
 
-      const updates = {};
-      if (patch.name           !== undefined) updates.Name              = P.title(patch.name);
-      if (patch.from           !== undefined) updates.From              = P.rich(patch.from || "");
-      if (patch.city           !== undefined) updates.City              = P.rich(patch.city || "");
-      if (patch.birthday       !== undefined) updates.Birthday          = P.date(patch.birthday || null);
-      if (patch.groups         !== undefined) updates.Group             = P.relation(patch.groups || []);
-      if (patch.lastSeen       !== undefined) updates["Last Seen"]      = P.rich(patch.lastSeen || "");
-      if (patch.giftIdeas      !== undefined) updates["Gift Ideas"]     = P.rich(patch.giftIdeas || "");
-      if (patch.tags           !== undefined) updates.Tags              = P.mselect(patch.tags || []);
-      if (patch.context        !== undefined) updates.Context           = P.rich(patch.context || "");
-      if (patch.linkedContacts !== undefined) updates["Linked Contacts"] = P.rich(JSON.stringify(patch.linkedContacts || []));
-      if (patch.introducedBy   !== undefined) updates["Introduced By"]  = P.rich(patch.introducedBy || "");
+      const existing = await getContact(id);
+      const updated = toGooglePerson(patch, existing);
 
-      const page = await notion.pages.update({ page_id: id, properties: updates });
-      return res.json(toContact(page));
+      // Handle group membership changes
+      if (patch.groups !== undefined) {
+        const oldGroups = (existing.memberships || [])
+          .filter(m => !m.contactGroupMembership?.contactGroupResourceName?.includes("myContacts"))
+          .map(m => m.contactGroupMembership?.contactGroupResourceName || "");
+
+        const toAdd = (patch.groups || []).filter(g => !oldGroups.includes(g));
+        const toRemove = oldGroups.filter(g => !(patch.groups || []).includes(g));
+
+        for (const groupId of toAdd) {
+          await addContactToGroup(id, groupId).catch(() => {});
+        }
+        for (const groupId of toRemove) {
+          await removeContactFromGroup(id, groupId).catch(() => {});
+        }
+      }
+
+      const result = await updateContact(id, updated);
+      return res.json(toContact(result));
     }
 
     if (req.method === "DELETE") {
       const { id } = req.body;
       if (!id) return res.status(400).json({ error: "id required" });
-      await notion.pages.update({ page_id: id, archived: true });
+      await deleteContact(id);
       return res.json({ ok: true });
     }
 

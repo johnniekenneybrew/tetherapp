@@ -1,14 +1,24 @@
-import { notion, DB, P, p, queryAll, setCors } from "./_notion.js";
+import {
+  getContact, updateContact, isConnected,
+  getCustomField, setCustomField
+} from "./_google-people.js";
+import { setCors } from "./_notion.js";
 
-function toNote(page) {
-  const props = page.properties;
-  const contactIds = p.relation(props.Contact);
+function toNote(contactId, noteKey, noteValue) {
+  // noteKey format: "note_TIMESTAMP"
+  // noteValue format: JSON string { text, timestamp } or plain text (for migration)
+  let parsed;
+  try {
+    parsed = typeof noteValue === "string" ? JSON.parse(noteValue) : noteValue;
+  } catch {
+    parsed = { text: noteValue, timestamp: new Date().toISOString() };
+  }
+
   return {
-    _pageId: page.id,
-    id: page.id,
-    contactId: contactIds[0] || null,
-    text: p.title(props.Note),
-    timestamp: p.date(props.Timestamp) || new Date().toISOString().slice(0, 10),
+    id: noteKey,
+    contactId,
+    text: parsed.text || parsed,
+    timestamp: parsed.timestamp || new Date().toISOString(),
   };
 }
 
@@ -17,36 +27,64 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
 
   try {
+    const connected = await isConnected();
+    if (!connected) return res.status(401).json({ error: "Google Contacts not connected" });
+
     if (req.method === "GET") {
       const { contactId } = req.query;
-      const filter = contactId
-        ? { property: "Contact", relation: { contains: contactId } }
-        : undefined;
-      const pages = await queryAll(DB.CONTACT_NOTES, filter, [
-        { property: "Timestamp", direction: "descending" },
-      ]);
-      return res.json(pages.map(toNote));
+      if (!contactId) return res.status(400).json({ error: "contactId required" });
+
+      const contact = await getContact(contactId);
+      const userDefined = contact.userDefined || [];
+
+      // Extract all note_* fields
+      const notes = [];
+      for (const field of userDefined) {
+        const key = field.metadata?.userDefined?.key || "";
+        if (key.startsWith("note_")) {
+          notes.push(toNote(contactId, key, field.value));
+        }
+      }
+
+      // Sort by timestamp descending (newest first)
+      notes.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+      return res.json(notes);
     }
 
     if (req.method === "POST") {
       const { contactId, text, timestamp } = req.body;
       if (!contactId || !text) return res.status(400).json({ error: "contactId and text required" });
+
       const ts = timestamp || new Date().toISOString();
-      const page = await notion.pages.create({
-        parent: { database_id: DB.CONTACT_NOTES },
-        properties: {
-          Note:      P.title(text),
-          Contact:   P.relation([contactId]),
-          Timestamp: P.date(ts),
-        },
-      });
-      return res.json(toNote(page));
+      // Create unique key from timestamp
+      const noteKey = "note_" + ts.replace(/\D/g, "_");
+
+      const contact = await getContact(contactId);
+      let userDefined = contact.userDefined || [];
+
+      // Add new note
+      userDefined = setCustomField(userDefined, noteKey, JSON.stringify({ text, timestamp: ts }));
+
+      // Update contact
+      await updateContact(contactId, { userDefined });
+
+      return res.json(toNote(contactId, noteKey, { text, timestamp: ts }));
     }
 
     if (req.method === "DELETE") {
-      const { id } = req.body;
-      if (!id) return res.status(400).json({ error: "id required" });
-      await notion.pages.update({ page_id: id, archived: true });
+      const { id, contactId } = req.body;
+      if (!id || !contactId) return res.status(400).json({ error: "id and contactId required" });
+
+      const contact = await getContact(contactId);
+      let userDefined = contact.userDefined || [];
+
+      // Remove note field
+      userDefined = userDefined.filter(f => f.metadata?.userDefined?.key !== id);
+
+      // Update contact
+      await updateContact(contactId, { userDefined });
+
       return res.json({ ok: true });
     }
 
