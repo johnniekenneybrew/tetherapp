@@ -44,6 +44,7 @@ export function SocialPage({ state, setState, actions }) {
   const [search, setSearch] = useState("");
   const [compact, setCompact] = useState(false);
   const [showLinksView, setShowLinksView] = useState(false);
+  const [viewContactId, setViewContactId] = useState(null);
 
   const groups = state.contactGroups || [];
   const contacts = state.contacts || [];
@@ -173,6 +174,7 @@ export function SocialPage({ state, setState, actions }) {
                 onDeleteNote={(nid) => actions.deleteNote(c.id, nid)}
                 onCreateContact={createContactInline}
                 onUpdateOtherContact={(otherId, patch) => actions.updateContact(otherId, patch)}
+                onOpenContact={setViewContactId}
               />
             ))}
             {sorted.length === 0 && (
@@ -196,6 +198,49 @@ export function SocialPage({ state, setState, actions }) {
         <ManageTagsModal groups={groups} onClose={() => setShowManageTags(false)}
           onSave={(newGroups) => { actions.saveContactGroups(newGroups); setShowManageTags(false); }} />
       )}
+
+      {viewContactId && (() => {
+        const vc = contacts.find((c) => c.id === viewContactId);
+        if (!vc) return null;
+        return (
+          <div
+            style={{
+              position: "fixed", inset: 0, zIndex: 400,
+              background: "rgba(0,0,0,0.45)", display: "flex",
+              alignItems: "center", justifyContent: "center", padding: 20,
+            }}
+            onClick={() => setViewContactId(null)}>
+            <div
+              style={{
+                background: "var(--surface)", borderRadius: 14,
+                maxWidth: 520, width: "100%", maxHeight: "85vh",
+                overflowY: "auto", boxShadow: "0 8px 40px rgba(0,0,0,0.22)",
+              }}
+              onClick={(e) => e.stopPropagation()}>
+              <div style={{ display: "flex", justifyContent: "flex-end", padding: "12px 16px 0" }}>
+                <button className="btn-text" style={{ fontSize: 20, lineHeight: 1, color: "var(--text-3)" }}
+                  onClick={() => setViewContactId(null)}>×</button>
+              </div>
+              <div style={{ padding: "0 4px 12px" }}>
+                <ContactCard
+                  c={vc}
+                  compact={false}
+                  groupById={groupById}
+                  allGroups={groups}
+                  allContacts={contacts}
+                  onUpdate={(patch) => actions.updateContact(vc.id, patch)}
+                  onDelete={() => { actions.deleteContact(vc.id); setViewContactId(null); }}
+                  onAddNote={(text) => actions.addNote(vc.id, text)}
+                  onDeleteNote={(nid) => actions.deleteNote(vc.id, nid)}
+                  onCreateContact={createContactInline}
+                  onUpdateOtherContact={(otherId, patch) => actions.updateContact(otherId, patch)}
+                  onOpenContact={setViewContactId}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -291,7 +336,7 @@ function RelationshipLinksView({ contacts }) {
 
 // ----------- Contact card -----------
 
-function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, onDelete, onAddNote, onDeleteNote, onCreateContact, onUpdateOtherContact }) {
+function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, onDelete, onAddNote, onDeleteNote, onCreateContact, onUpdateOtherContact, onOpenContact }) {
   const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [editLastSeen, setEditLastSeen] = useState(false);
   const [lastSeenVal, setLastSeenVal] = useState(c.lastSeen || "");
@@ -478,7 +523,8 @@ function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, 
               {linkedContacts.slice(0, 3).map((link) => {
                 const ct = allContactsById[link.id];
                 return ct ? (
-                  <span key={link.id} className="linked-contact-pill" style={{ fontSize: 10.5 }}>
+                  <span key={link.id} className="linked-contact-pill" style={{ fontSize: 10.5, cursor: "pointer" }}
+                    onClick={(e) => { e.stopPropagation(); onOpenContact?.(link.id); }}>
                     <span className="linked-avatar" style={{ width: 14, height: 14, fontSize: 6 }}>{initials(ct.name)}</span>
                     <span className="linked-name">{ct.name}</span>
                     {link.relationship && <span className="linked-rel">— {link.relationship}</span>}
@@ -648,9 +694,12 @@ function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, 
                 const ct = allContactsById[link.id];
                 return ct ? (
                   <span key={link.id} className="linked-contact-pill">
-                    <span className="linked-avatar">{initials(ct.name)}</span>
-                    <span className="linked-name">{ct.name}</span>
-                    {link.relationship && <span className="linked-rel">— {link.relationship}</span>}
+                    <span style={{ display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}
+                      onClick={() => onOpenContact?.(link.id)}>
+                      <span className="linked-avatar">{initials(ct.name)}</span>
+                      <span className="linked-name">{ct.name}</span>
+                      {link.relationship && <span className="linked-rel">— {link.relationship}</span>}
+                    </span>
                     <button className="group-tag-remove" onClick={() => removeLinkedContact(link.id)}>×</button>
                   </span>
                 ) : null;
