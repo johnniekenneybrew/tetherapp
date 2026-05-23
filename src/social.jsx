@@ -11,14 +11,6 @@ const formatBirthday = (bday) => {
   return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()}`;
 };
 
-const fmtBday = (bday) => {
-  if (!bday) return "—";
-  const d = new Date(bday + "T00:00:00");
-  const year = d.getFullYear();
-  if (year === 2000) return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
-  return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${year}`;
-};
-
 const daysUntilBirthday = (bday) => {
   if (!bday) return Infinity;
   const d = new Date(bday + "T00:00:00");
@@ -29,7 +21,6 @@ const daysUntilBirthday = (bday) => {
 
 const fmtTimestamp = (iso) => {
   if (!iso) return "";
-  // Date-only strings (from old notes) — show just date, no bogus time
   const hasTime = iso.includes("T");
   const d = new Date(hasTime ? iso : iso + "T12:00:00");
   const mo = MONTHS[d.getMonth()].slice(0, 3);
@@ -41,12 +32,15 @@ const fmtTimestamp = (iso) => {
   return `${mo} ${day} · ${h % 12 || 12}:${m} ${ampm}`;
 };
 
+const initials = (name) => (name || "?").split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+
 export function SocialPage({ state, setState, actions }) {
   const [groupFilter, setGroupFilter] = useState("all");
   const [tagFilter, setTagFilter] = useState(null);
   const [showAddContact, setShowAddContact] = useState(false);
   const [showManageGroups, setShowManageGroups] = useState(false);
   const [search, setSearch] = useState("");
+  const [compact, setCompact] = useState(false);
 
   const groups = state.contactGroups || [];
   const contacts = state.contacts || [];
@@ -78,6 +72,17 @@ export function SocialPage({ state, setState, actions }) {
           </p>
         </div>
         <div className="row" style={{ gap: 8 }}>
+          {/* Compact toggle */}
+          <button className={"btn" + (compact ? " btn-primary" : "")} onClick={() => setCompact((v) => !v)}
+            title={compact ? "Switch to list view" : "Switch to grid view"}>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              {compact
+                ? <><rect x="1" y="1" width="12" height="3" rx="1" fill="currentColor" opacity=".4"/><rect x="1" y="5.5" width="12" height="3" rx="1" fill="currentColor" opacity=".4"/><rect x="1" y="10" width="12" height="3" rx="1" fill="currentColor"/></>
+                : <><rect x="1" y="1" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="7.5" y="1" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="1" y="7.5" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="7.5" y="7.5" width="5.5" height="5.5" rx="1" fill="currentColor"/></>
+              }
+            </svg>
+            {compact ? "List" : "Grid"}
+          </button>
           <button className="btn" onClick={() => setShowManageGroups(true)}>Manage groups</button>
           <button className="btn btn-primary" onClick={() => setShowAddContact(true)}>
             <Icon.Plus /> Add contact
@@ -138,13 +143,15 @@ export function SocialPage({ state, setState, actions }) {
       })()}
 
       {/* Contact list */}
-      <div className="contact-list">
+      <div className={compact ? "contact-list contact-list--grid" : "contact-list"}>
         {sorted.map((c) => (
           <ContactCard
             key={c.id}
             c={c}
+            compact={compact}
             groupById={groupById}
             allGroups={groups}
+            allContacts={contacts}
             onUpdate={(patch) => actions.updateContact(c.id, patch)}
             onDelete={() => actions.deleteContact(c.id)}
             onAddNote={(text) => actions.addNote(c.id, text)}
@@ -152,7 +159,7 @@ export function SocialPage({ state, setState, actions }) {
           />
         ))}
         {sorted.length === 0 && (
-          <div className="card" style={{ textAlign: "center", color: "var(--text-3)", padding: "40px 16px" }}>
+          <div className="card" style={{ textAlign: "center", color: "var(--text-3)", padding: "40px 16px", gridColumn: "1/-1" }}>
             {search ? "No contacts match your search." : "No contacts yet. Add your first one above."}
           </div>
         )}
@@ -172,21 +179,26 @@ export function SocialPage({ state, setState, actions }) {
 
 // ----------- Contact card -----------
 
-function ContactCard({ c, groupById, allGroups, onUpdate, onDelete, onAddNote, onDeleteNote }) {
+function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, onDelete, onAddNote, onDeleteNote }) {
   const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [editLastSeen, setEditLastSeen] = useState(false);
   const [lastSeenVal, setLastSeenVal] = useState(c.lastSeen || "");
   const [editGift, setEditGift] = useState(false);
   const [giftVal, setGiftVal] = useState(c.giftIdeas || "");
+  const [editContext, setEditContext] = useState(false);
+  const [contextVal, setContextVal] = useState(c.context || "");
   const [noteText, setNoteText] = useState("");
   const [expandedNotes, setExpandedNotes] = useState(new Set());
   const [showEditModal, setShowEditModal] = useState(false);
   const [showKebab, setShowKebab] = useState(false);
+  const [showLinkPicker, setShowLinkPicker] = useState(false);
   const pickerRef = useRef(null);
   const kebabRef = useRef(null);
+  const linkPickerRef = useRef(null);
 
   useEffect(() => { setLastSeenVal(c.lastSeen || ""); }, [c.lastSeen]);
   useEffect(() => { setGiftVal(c.giftIdeas || ""); }, [c.giftIdeas]);
+  useEffect(() => { setContextVal(c.context || ""); }, [c.context]);
 
   useEffect(() => {
     if (!showGroupPicker) return;
@@ -202,9 +214,18 @@ function ContactCard({ c, groupById, allGroups, onUpdate, onDelete, onAddNote, o
     return () => document.removeEventListener("mousedown", h);
   }, [showKebab]);
 
+  useEffect(() => {
+    if (!showLinkPicker) return;
+    const h = (e) => { if (linkPickerRef.current && !linkPickerRef.current.contains(e.target)) setShowLinkPicker(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [showLinkPicker]);
+
   const contactGroups = c.groups || [];
   const bdayDays = daysUntilBirthday(c.birthday);
   const availableGroups = allGroups.filter((g) => !contactGroups.includes(g.id));
+  const allContactsById = Object.fromEntries(allContacts.map((ct) => [ct.id, ct]));
+  const linkedContacts = c.linkedContacts || [];
 
   const addGroup = (gid) => { onUpdate({ groups: [...contactGroups, gid] }); setShowGroupPicker(false); };
   const removeGroup = (gid) => onUpdate({ groups: contactGroups.filter((id) => id !== gid) });
@@ -217,6 +238,10 @@ function ContactCard({ c, groupById, allGroups, onUpdate, onDelete, onAddNote, o
     setEditGift(false);
     if (giftVal.trim() !== (c.giftIdeas || "")) onUpdate({ giftIdeas: giftVal.trim() });
   };
+  const saveContext = () => {
+    setEditContext(false);
+    if (contextVal !== (c.context || "")) onUpdate({ context: contextVal });
+  };
   const addNote = () => {
     if (!noteText.trim()) return;
     onAddNote(noteText.trim());
@@ -228,15 +253,70 @@ function ContactCard({ c, groupById, allGroups, onUpdate, onDelete, onAddNote, o
     return next;
   });
 
-  const PREVIEW = 90;
+  const addLinkedContact = (id, relationship) => {
+    const next = [...linkedContacts, { id, relationship }];
+    onUpdate({ linkedContacts: next });
+    setShowLinkPicker(false);
+  };
+  const removeLinkedContact = (id) => {
+    onUpdate({ linkedContacts: linkedContacts.filter((l) => l.id !== id) });
+  };
 
+  const PREVIEW = 90;
+  const inits = initials(c.name);
+
+  // Compact card
+  if (compact) {
+    return (
+      <div className="contact-card contact-card--compact">
+        <div className="contact-row" style={{ padding: "12px 14px", gap: 10 }}>
+          <div className="contact-avatar" style={{ width: 30, height: 30, fontSize: 10, flexShrink: 0 }}>{inits}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="contact-name" style={{ fontSize: 13.5 }}>{c.name}</div>
+            {contactGroups.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 3 }}>
+                {contactGroups.map((gid) => {
+                  const grp = groupById[gid];
+                  return grp ? (
+                    <span key={gid} className="contact-group-tag" style={{ fontSize: 10.5, padding: "1px 5px" }}>
+                      {grp.icon && <span style={{ marginRight: 2 }}>{grp.icon}</span>}{grp.name}
+                    </span>
+                  ) : null;
+                })}
+              </div>
+            )}
+            {c.lastSeen && (
+              <div style={{ fontSize: 11, color: "var(--text-2)", marginTop: 3 }}>Last seen {c.lastSeen}</div>
+            )}
+            {c.city && <div className="tiny" style={{ color: "var(--text-3)", marginTop: 2 }}>{c.city}</div>}
+          </div>
+          <div style={{ position: "relative", flexShrink: 0 }} ref={kebabRef}>
+            <button className="contact-kebab" onClick={(e) => { e.stopPropagation(); setShowKebab((v) => !v); }}>
+              <Icon.Kebab />
+            </button>
+            {showKebab && (
+              <div className="kebab-dropdown">
+                <button onClick={(e) => { e.stopPropagation(); setShowEditModal(true); setShowKebab(false); }}>Edit contact</button>
+                <button style={{ color: "var(--error)" }} onClick={(e) => { e.stopPropagation(); onDelete(); }}>Delete</button>
+              </div>
+            )}
+          </div>
+        </div>
+        {showEditModal && (
+          <EditContactModal contact={c} groups={allGroups}
+            onClose={() => setShowEditModal(false)}
+            onSave={(patch) => { onUpdate(patch); setShowEditModal(false); }} />
+        )}
+      </div>
+    );
+  }
+
+  // Full card
   return (
     <div className="contact-card">
       {/* Main info row */}
       <div className="contact-row">
-        <div className="contact-avatar">
-          {c.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}
-        </div>
+        <div className="contact-avatar">{inits}</div>
 
         <div className="contact-info">
           <div className="contact-name">{c.name}</div>
@@ -269,7 +349,20 @@ function ContactCard({ c, groupById, allGroups, onUpdate, onDelete, onAddNote, o
                 </div>
               )}
             </div>
-            {c.city && <span>{c.city}</span>}
+          </div>
+
+          {/* From + Current Location */}
+          <div style={{ display: "flex", gap: 12, marginTop: 4, flexWrap: "wrap" }}>
+            {c.from && (
+              <span className="tiny" style={{ color: "var(--text-2)" }}>
+                <span style={{ color: "var(--text-3)" }}>From</span> {c.from}
+              </span>
+            )}
+            {c.city && (
+              <span className="tiny" style={{ color: "var(--text-2)" }}>
+                <span style={{ color: "var(--text-3)" }}>Now</span> {c.city}
+              </span>
+            )}
           </div>
 
           {(c.tags || []).length > 0 && (
@@ -314,7 +407,9 @@ function ContactCard({ c, groupById, allGroups, onUpdate, onDelete, onAddNote, o
             ) : (
               <button className="inline-edit-trigger contact-lastseen"
                 onClick={(e) => { e.stopPropagation(); setLastSeenVal(c.lastSeen || ""); setEditLastSeen(true); }}>
-                {c.lastSeen ? `Seen ${c.lastSeen}` : <span style={{ color: "var(--text-3)" }}>+ last seen</span>}
+                {c.lastSeen
+                  ? <><span style={{ color: "var(--text-3)" }}>Last seen</span> {c.lastSeen}</>
+                  : <span style={{ color: "var(--text-3)" }}>+ last seen</span>}
               </button>
             )}
           </span>
@@ -334,8 +429,61 @@ function ContactCard({ c, groupById, allGroups, onUpdate, onDelete, onAddNote, o
         </div>
       </div>
 
-      {/* Notes */}
-      <div className="contact-notes-inline">
+      {/* Context section */}
+      <div className="contact-section" style={{ padding: "0 18px 0 68px" }}>
+        <div className="contact-section-label">Context</div>
+        {editContext ? (
+          <textarea className="input" rows={3} style={{ fontSize: 13, marginTop: 4 }}
+            value={contextVal}
+            onChange={(e) => setContextVal(e.target.value)}
+            onBlur={saveContext}
+            onKeyDown={(e) => { if (e.key === "Escape") saveContext(); }}
+            autoFocus placeholder="Relationship context — how you know them, what matters…" />
+        ) : (
+          <button className="inline-edit-trigger" style={{ display: "block", textAlign: "left", padding: "4px 6px", width: "100%", marginTop: 2 }}
+            onClick={() => { setContextVal(c.context || ""); setEditContext(true); }}>
+            {c.context
+              ? <span style={{ color: "var(--text)", fontSize: 13, lineHeight: 1.5 }}>{c.context}</span>
+              : <span style={{ color: "var(--text-3)", fontSize: 13 }}>+ add context…</span>}
+          </button>
+        )}
+      </div>
+
+      {/* Linked contacts */}
+      <div className="contact-section" style={{ padding: "8px 18px 0 68px" }}>
+        <div className="contact-section-label">Linked contacts</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 5 }}>
+          {linkedContacts.map((link) => {
+            const ct = allContactsById[link.id];
+            return ct ? (
+              <span key={link.id} className="linked-contact-pill">
+                <span className="linked-avatar">{initials(ct.name)}</span>
+                <span className="linked-name">{ct.name}</span>
+                {link.relationship && <span className="linked-rel">— {link.relationship}</span>}
+                <button className="group-tag-remove" onClick={() => removeLinkedContact(link.id)}>×</button>
+              </span>
+            ) : null;
+          })}
+          <div style={{ position: "relative" }} ref={linkPickerRef}>
+            <button className="add-group-btn" style={{ width: "auto", padding: "2px 8px", fontSize: 12, borderRadius: 6 }}
+              onClick={(e) => { e.stopPropagation(); setShowLinkPicker((v) => !v); }}>
+              + Link
+            </button>
+            {showLinkPicker && (
+              <LinkedContactPicker
+                allContacts={allContacts}
+                excludeIds={[c.id, ...linkedContacts.map((l) => l.id)]}
+                onSelect={addLinkedContact}
+                onClose={() => setShowLinkPicker(false)}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Notes — recent updates */}
+      <div className="contact-notes-inline" style={{ paddingTop: 10 }}>
+        <div className="contact-section-label" style={{ marginBottom: 6 }}>Recent updates</div>
         {(c.notes || []).map((n) => {
           const expanded = expandedNotes.has(n.id);
           const long = n.text.length > PREVIEW;
@@ -359,7 +507,7 @@ function ContactCard({ c, groupById, allGroups, onUpdate, onDelete, onAddNote, o
           );
         })}
         <div className="card-note-add-row">
-          <input className="input input--xs" style={{ flex: 1 }} placeholder="Add a note…"
+          <input className="input input--xs" style={{ flex: 1 }} placeholder="Add a recent update…"
             value={noteText} onChange={(e) => setNoteText(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") addNote(); }} />
           <button className="btn btn-primary" style={{ padding: "3px 12px", fontSize: 12 }}
@@ -376,14 +524,73 @@ function ContactCard({ c, groupById, allGroups, onUpdate, onDelete, onAddNote, o
   );
 }
 
+// ----------- Linked contact picker -----------
+
+function LinkedContactPicker({ allContacts, excludeIds, onSelect, onClose }) {
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState(null);
+  const [relationship, setRelationship] = useState("");
+
+  const filtered = allContacts.filter((c) =>
+    !excludeIds.includes(c.id) &&
+    (!search || c.name.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  return (
+    <div className="link-picker-dropdown">
+      {!selected ? (
+        <>
+          <input className="input input--xs" style={{ width: "100%", marginBottom: 6 }}
+            placeholder="Search contacts…" value={search}
+            onChange={(e) => setSearch(e.target.value)} autoFocus />
+          <div style={{ maxHeight: 180, overflowY: "auto" }}>
+            {filtered.length === 0 && <div className="tiny" style={{ padding: "6px 4px", color: "var(--text-3)" }}>No contacts found</div>}
+            {filtered.map((c) => (
+              <button key={c.id} onClick={() => setSelected(c)}
+                style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "6px 8px", borderRadius: 6, background: "none", border: "none", cursor: "pointer", textAlign: "left", fontSize: 13 }}
+                onMouseEnter={(e) => e.currentTarget.style.background = "var(--surface-2)"}
+                onMouseLeave={(e) => e.currentTarget.style.background = "none"}>
+                <span style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--surface-2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 600, flexShrink: 0 }}>
+                  {initials(c.name)}
+                </span>
+                {c.name}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : (
+        <div>
+          <div style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 8 }}>
+            Linking <strong>{selected.name}</strong>
+          </div>
+          <input className="input input--xs" style={{ width: "100%", marginBottom: 8 }}
+            placeholder="Relationship (e.g. Father, Partner)"
+            value={relationship} onChange={(e) => setRelationship(e.target.value)}
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onSelect(selected.id, relationship.trim());
+              if (e.key === "Escape") setSelected(null);
+            }} />
+          <div style={{ display: "flex", gap: 6 }}>
+            <button className="btn btn-primary" style={{ fontSize: 12, padding: "3px 10px" }}
+              onClick={() => onSelect(selected.id, relationship.trim())}>Link</button>
+            <button className="btn-text" style={{ fontSize: 12 }} onClick={() => setSelected(null)}>Back</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ----------- Edit Contact modal -----------
 
 function EditContactModal({ contact, groups, onClose, onSave }) {
-  const [name, setName] = useState(contact.name);
-  const [city, setCity] = useState(contact.city || "");
-  const [birthday, setBirthday] = useState(contact.birthday || "");
+  const [name, setName]           = useState(contact.name);
+  const [from, setFrom]           = useState(contact.from || "");
+  const [city, setCity]           = useState(contact.city || "");
+  const [birthday, setBirthday]   = useState(contact.birthday || "");
   const [editGroups, setEditGroups] = useState(contact.groups || []);
-  const [lastSeen, setLastSeen] = useState(contact.lastSeen || "");
+  const [lastSeen, setLastSeen]   = useState(contact.lastSeen || "");
   const [giftIdeas, setGiftIdeas] = useState(contact.giftIdeas || "");
 
   const toggleGroup = (gid) => setEditGroups((prev) =>
@@ -394,13 +601,17 @@ function EditContactModal({ contact, groups, onClose, onSave }) {
     <div className="modal-back" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h3>Edit contact</h3>
+        <div className="field">
+          <label>Name</label>
+          <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <div className="field">
-            <label>Name</label>
-            <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+            <label>From</label>
+            <input className="input" value={from} onChange={(e) => setFrom(e.target.value)} placeholder="e.g. Boston, Colombia" />
           </div>
           <div className="field">
-            <label>City</label>
+            <label>Current location</label>
             <input className="input" value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. New York" />
           </div>
           <div className="field">
@@ -431,7 +642,12 @@ function EditContactModal({ contact, groups, onClose, onSave }) {
         </div>
         <div className="actions">
           <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={() => onSave({ name: name.trim() || contact.name, city: city.trim(), birthday, groups: editGroups, lastSeen: lastSeen.trim(), giftIdeas: giftIdeas.trim() })}>Save</button>
+          <button className="btn btn-primary" onClick={() => onSave({
+            name: name.trim() || contact.name,
+            from: from.trim(), city: city.trim(),
+            birthday, groups: editGroups,
+            lastSeen: lastSeen.trim(), giftIdeas: giftIdeas.trim(),
+          })}>Save</button>
         </div>
       </div>
     </div>
@@ -474,11 +690,12 @@ function BirthdayInput({ value, onChange }) {
 // ----------- Add Contact modal -----------
 
 function AddContactModal({ groups, onClose, onSave }) {
-  const [name, setName] = useState("");
-  const [city, setCity] = useState("");
-  const [birthday, setBirthday] = useState("");
+  const [name, setName]               = useState("");
+  const [from, setFrom]               = useState("");
+  const [city, setCity]               = useState("");
+  const [birthday, setBirthday]       = useState("");
   const [selectedGroups, setSelectedGroups] = useState([]);
-  const [lastSeen, setLastSeen] = useState("");
+  const [lastSeen, setLastSeen]       = useState("");
 
   const toggleGroup = (gid) => setSelectedGroups((prev) =>
     prev.includes(gid) ? prev.filter((id) => id !== gid) : [...prev, gid]
@@ -486,7 +703,7 @@ function AddContactModal({ groups, onClose, onSave }) {
 
   const save = () => {
     if (!name.trim()) return;
-    onSave({ id: "c-" + Date.now(), name: name.trim(), city: city.trim(), birthday: birthday || null, groups: selectedGroups, lastSeen: lastSeen.trim() || null, notes: [] });
+    onSave({ id: "c-" + Date.now(), name: name.trim(), from: from.trim(), city: city.trim(), birthday: birthday || null, groups: selectedGroups, lastSeen: lastSeen.trim() || null, notes: [] });
   };
 
   return (
@@ -500,12 +717,20 @@ function AddContactModal({ groups, onClose, onSave }) {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
           <div className="field">
-            <label>City</label>
+            <label>From</label>
+            <input className="input" placeholder="e.g. Boston" value={from} onChange={(e) => setFrom(e.target.value)} />
+          </div>
+          <div className="field">
+            <label>Current location</label>
             <input className="input" placeholder="e.g. London" value={city} onChange={(e) => setCity(e.target.value)} />
           </div>
           <div className="field">
             <label>Birthday</label>
             <BirthdayInput value={birthday} onChange={setBirthday} />
+          </div>
+          <div className="field">
+            <label>Last seen</label>
+            <input className="input" placeholder="e.g. Last week" value={lastSeen} onChange={(e) => setLastSeen(e.target.value)} />
           </div>
         </div>
         {groups.length > 0 && (
@@ -521,10 +746,6 @@ function AddContactModal({ groups, onClose, onSave }) {
             </div>
           </div>
         )}
-        <div className="field">
-          <label>Last seen</label>
-          <input className="input" placeholder="e.g. Last week" value={lastSeen} onChange={(e) => setLastSeen(e.target.value)} />
-        </div>
         <div className="actions">
           <button className="btn" onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" onClick={save} disabled={!name.trim()}>Add contact</button>

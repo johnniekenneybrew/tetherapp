@@ -23,7 +23,7 @@ export function DailyCheckIn({ state, setState, navigateTo, actions }) {
   const [dragRoutineId, setDragRoutineId] = useState(null);
   const [dragOverRoutineId, setDragOverRoutineId] = useState(null);
 
-  const [priorities, setPriorities] = useState(state.checkin?.priorities || []);
+  const [priorities, setPriorities] = useState(state.checkin?.priorities ?? []);
   const [newPriority, setNewPriority] = useState("");
   const [newAccount, setNewAccount] = useState("getro");
   const [gratitude, setGratitude] = useState(state.checkin?.gratitude || ["", "", ""]);
@@ -42,7 +42,7 @@ export function DailyCheckIn({ state, setState, navigateTo, actions }) {
     }));
   }, [priorities, gratitude, learnings, sectionsDone]);
 
-  const prioritiesReady = priorities.length >= 1;
+  const prioritiesReady = priorities.length >= 1 || newPriority.trim().length > 0;
   const habitsReady = true;
   const gratitudeReady = gratitude.every((g) => g.trim().length > 2);
   const learningsReady = learnings.every((g) => g.trim().length > 2);
@@ -69,21 +69,37 @@ export function DailyCheckIn({ state, setState, navigateTo, actions }) {
     setTimeout(() => navigateTo({ page: "todo" }), 900);
   };
 
-  const addPriority = () => {
-    if (!newPriority.trim() || priorities.length >= 5) return;
-    setPriorities((arr) => [
-      ...arr,
-      { id: Date.now(), text: newPriority.trim(), account: newAccount, done: false },
-    ]);
+  const addPriority = (currentPriorities = priorities) => {
+    if (!newPriority.trim() || currentPriorities.length >= 5) return null;
+    const item = { id: Date.now(), text: newPriority.trim(), account: newAccount, done: false };
+    const next = [...currentPriorities, item];
+    setPriorities(next);
     setNewPriority("");
     setSectionsDone((s) => ({ ...s, priorities: false }));
+    actions.updateCheckin({ priorities: next });
+    return next;
   };
   const togglePriorityDone = (id) => {
-    setPriorities((arr) => arr.map((p) => p.id === id ? { ...p, done: !p.done } : p));
+    const next = priorities.map((p) => p.id === id ? { ...p, done: !p.done } : p);
+    setPriorities(next);
+    actions.updateCheckin({ priorities: next });
   };
   const removePriority = (id) => {
-    setPriorities((arr) => arr.filter((p) => p.id !== id));
+    const next = priorities.filter((p) => p.id !== id);
+    setPriorities(next);
     setSectionsDone((s) => ({ ...s, priorities: false }));
+    actions.updateCheckin({ priorities: next });
+  };
+  const markPrioritiesComplete = () => {
+    let current = priorities;
+    if (newPriority.trim() && priorities.length < 5) {
+      const item = { id: Date.now(), text: newPriority.trim(), account: newAccount, done: false };
+      current = [...priorities, item];
+      setPriorities(current);
+      setNewPriority("");
+      actions.updateCheckin({ priorities: current });
+    }
+    setSectionDone("priorities", true);
   };
 
   const toggleYHabit = (habitId) => {
@@ -192,8 +208,8 @@ export function DailyCheckIn({ state, setState, navigateTo, actions }) {
               <SectionFooter
                 done={sectionsDone.priorities}
                 ready={prioritiesReady}
-                readyHint={priorities.length === 0 ? "Add at least one priority" : null}
-                onMark={() => setSectionDone("priorities", true)}
+                readyHint={!prioritiesReady ? "Add at least one priority" : null}
+                onMark={markPrioritiesComplete}
                 onEdit={() => setSectionDone("priorities", false)}
               />
             </div>

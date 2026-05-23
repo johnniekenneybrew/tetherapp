@@ -1,6 +1,25 @@
 import { notion, DB, P, p, queryAll, setCors } from "./_notion.js";
 
-const TODAY_ISO = "2026-05-22";
+let schemaReady = false;
+async function ensureCheckinSchema() {
+  if (schemaReady) return;
+  try {
+    const db = await notion.databases.retrieve({ database_id: DB.CHECKINS });
+    const updates = {};
+    if (!db.properties.Priorities) updates.Priorities = { rich_text: {} };
+    if (Object.keys(updates).length > 0) {
+      await notion.databases.update({ database_id: DB.CHECKINS, properties: updates });
+    }
+    schemaReady = true;
+  } catch (e) {
+    console.error("ensureCheckinSchema failed", e);
+    schemaReady = true;
+  }
+}
+
+function parsePriorities(raw) {
+  try { return JSON.parse(raw || "[]"); } catch { return []; }
+}
 
 function toCheckin(page) {
   const props = page.properties;
@@ -17,6 +36,7 @@ function toCheckin(page) {
       p.rich(props["Learning 2"]) || "",
       p.rich(props["Learning 3"]) || "",
     ],
+    priorities: parsePriorities(p.rich(props.Priorities)),
     completed: p.checkbox(props.Completed),
     sectionsDone: {},
     habitsUpdatedConfirmed: false,
@@ -28,6 +48,8 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
 
   try {
+    await ensureCheckinSchema();
+
     if (req.method === "GET") {
       const date = req.query.date;
       if (!date) return res.status(400).json({ error: "date required" });
@@ -73,7 +95,8 @@ export default async function handler(req, res) {
         updates["Learning 2"] = P.rich(patch.learnings[1] || "");
         updates["Learning 3"] = P.rich(patch.learnings[2] || "");
       }
-      if (patch.completed !== undefined) updates.Completed = P.checkbox(patch.completed);
+      if (patch.completed  !== undefined) updates.Completed  = P.checkbox(patch.completed);
+      if (patch.priorities !== undefined) updates.Priorities = P.rich(JSON.stringify(patch.priorities || []));
 
       const page = await notion.pages.update({ page_id: id, properties: updates });
       return res.json(toCheckin(page));

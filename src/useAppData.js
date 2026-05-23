@@ -29,7 +29,7 @@ const EMPTY = {
   goalTasks:     [],
   habitLog:      {},
   routineLog:    {},
-  checkin:       { gratitude: ["", "", ""], learnings: ["", "", ""], sectionsDone: {}, completed: false, habitsUpdatedConfirmed: false },
+  checkin:       { priorities: [], gratitude: ["", "", ""], learnings: ["", "", ""], sectionsDone: {}, completed: false, habitsUpdatedConfirmed: false },
   contacts:      [],
   contactGroups: [],
 };
@@ -133,6 +133,7 @@ export function useAppData() {
           habitLog,
           routineLog,
           checkin: {
+            priorities:             checkin.priorities || [],
             gratitude:              checkin.gratitude || ["", "", ""],
             learnings:              checkin.learnings || ["", "", ""],
             sectionsDone:           checkin.sectionsDone || {},
