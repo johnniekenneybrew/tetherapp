@@ -17,7 +17,6 @@ function AuthedApp() {
   const { state, setState, loading, error, actions } = useAppData();
   const [route, setRoute] = useState({ page: "checkin" });
   const [hubSub, setHubSub] = useState("habits");
-  const [oauthBanner, setOauthBanner] = useState(null);
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
 
@@ -32,24 +31,6 @@ function AuthedApp() {
 
   const dateLabel = fmtShort(TODAY).split(", ")[1];
   const navigateTo = (r) => setRoute(r);
-
-  // Handle Google OAuth redirect
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const googleAuth = params.get("google_auth");
-    if (googleAuth) {
-      if (googleAuth === "success") {
-        setOauthBanner({ type: "success", msg: "Google Tasks connected successfully." });
-      } else {
-        const reason = params.get("reason") || "unknown";
-        setOauthBanner({ type: "error", msg: `Google Tasks connection failed: ${reason}` });
-      }
-      // Remove query params without reload
-      const clean = window.location.pathname;
-      window.history.replaceState({}, "", clean);
-      setTimeout(() => setOauthBanner(null), 6000);
-    }
-  }, []);
 
   // Sync area colors to CSS variables so dots/badges update live
   useEffect(() => {
@@ -102,21 +83,6 @@ function AuthedApp() {
 
   return (
     <div className="app">
-      {oauthBanner && (
-        <div style={{
-          position: "fixed", top: 0, left: 0, right: 0, zIndex: 9999,
-          padding: "12px 20px", fontSize: 13, fontWeight: 500,
-          background: oauthBanner.type === "success" ? "var(--green, #10B981)" : "var(--error, #EF4444)",
-          color: "#fff", textAlign: "center",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-        }}>
-          {oauthBanner.msg}
-          <button onClick={() => setOauthBanner(null)} style={{
-            marginLeft: 16, background: "none", border: "none", color: "#fff",
-            cursor: "pointer", fontSize: 14, fontWeight: 700,
-          }}>✕</button>
-        </div>
-      )}
       {toast && (
         <div className="toast">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">

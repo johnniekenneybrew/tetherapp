@@ -5,7 +5,7 @@ import {
   tasksApi, checkinApi, habitsApi, habitLogApi,
   routinesApi, routineLogApi, goalsApi, goalTasksApi,
   contactsApi, contactNotesApi, contactGroupsApi,
-  prefsApi, googleTasksApi,
+  prefsApi,
 } from './api';
 
 // ============================================================
@@ -160,15 +160,7 @@ export function useAppData() {
             .catch(() => {}); // localStorage fallback already loaded
         }
 
-        // Kick off Google Tasks sync in background (picks up changes from phone/other clients)
-        googleTasksApi.sync().then((result) => {
-          if (result?.synced > 0) {
-            // Re-fetch todos to show any new/updated tasks from Google
-            tasksApi.list().then((todos) => {
-              setStateRaw((s) => ({ ...s, todos }));
-            }).catch(() => {});
-          }
-        }).catch(() => {}); // Google sync is best-effort
+
       } catch (err) {
         console.error("loadAll failed", err);
         setError(err.message);
@@ -483,18 +475,6 @@ export function useAppData() {
       contactNotesApi.delete(noteId).then(() => showToast("Deleted")).catch(console.error);
     },
 
-    // ---------- GOOGLE TASKS ----------
-
-    syncGoogleTasks() {
-      return googleTasksApi.sync().then((result) => {
-        if (result?.synced > 0) {
-          tasksApi.list().then((todos) => {
-            setStateRaw((s) => ({ ...s, todos }));
-          }).catch(() => {});
-        }
-        return result;
-      });
-    },
 
     saveContactGroups(newGroups) {
       const prev = state.contactGroups;
