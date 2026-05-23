@@ -97,7 +97,7 @@ export async function runSync() {
           properties: {
             Title:            P.title(title),
             Done:             P.checkbox(done),
-            Account:          P.select("Personal"),
+            Account:          P.select("Getro"),
             Priority:         P.checkbox(false),
             Details:          P.rich(""),
             "Due Date":       P.date(null),
