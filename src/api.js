@@ -59,7 +59,7 @@ export const habitsApi = {
 // ============================================================
 export const habitLogApi = {
   range:  (from, to)              => get("/habits", { log: 1, from, to }),
-  toggle: (date, habitId, done)   => patch("/habits", { log: 1, date, habitId, done }),
+  toggle: (date, habitId, done)   => patch("/habits?log=1", { date, habitId, done }),
 };
 
 // ============================================================
@@ -77,7 +77,7 @@ export const routinesApi = {
 // ============================================================
 export const routineLogApi = {
   range:  (from, to)              => get("/routines", { log: 1, from, to }),
-  toggle: (date, routineId, done) => patch("/routines", { log: 1, date, routineId, done }),
+  toggle: (date, routineId, done) => patch("/routines?log=1", { date, routineId, done }),
 };
 
 // ============================================================
@@ -124,9 +124,9 @@ export const contactGroupsApi = {
 // ============================================================
 export const goalTasksApi = {
   list:   ()           => get("/goals", { tasks: 1 }),
-  create: (data)       => post("/goals", { tasks: 1, ...data }),
-  update: (id, patch_) => patch("/goals", { tasks: 1, id, ...patch_ }),
-  delete: (id)         => del("/goals", { tasks: 1, id }),
+  create: (data)       => post("/goals?tasks=1", data),
+  update: (id, patch_) => patch("/goals?tasks=1", { id, ...patch_ }),
+  delete: (id)         => del("/goals?tasks=1", { id }),
 };
 
 // ============================================================
