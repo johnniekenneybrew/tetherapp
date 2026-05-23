@@ -108,7 +108,7 @@ export default async function handler(req, res) {
     if (req.method === "GET") {
       const groups = await listContactGroups();
       // Filter out system groups (myContacts, starred, etc.)
-      const userGroups = groups.filter(g => !g.metadata?.isSystemContactGroup);
+      const userGroups = groups.filter(g => g.groupType === "USER_CONTACT_GROUP");
       return res.json(userGroups.map(toGroup));
     }
 

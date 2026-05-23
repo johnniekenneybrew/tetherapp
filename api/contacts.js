@@ -26,8 +26,8 @@ function toContact(googlePerson) {
       ? `${birthdays[0].date.year || "0000"}-${String(birthdays[0].date.month).padStart(2, "0")}-${String(birthdays[0].date.day).padStart(2, "0")}`
       : null,
     groups: memberships
-      .filter(m => !m.contactGroupMembership?.contactGroupResourceName?.includes("myContacts"))
-      .map(m => m.contactGroupMembership?.contactGroupResourceName || ""),
+      .map(m => m.contactGroupMembership?.contactGroupResourceName || "")
+      .filter(r => /^contactGroups\/\d+$/.test(r)), // only user groups (numeric IDs)
     linkedContacts: relations.map(r => ({
       id: r.person?.resourceName || "",
       name: r.person?.names?.[0]?.displayName || "",

@@ -126,7 +126,7 @@ export async function deleteContact(resourceName) {
 
 // List contact groups
 export async function listContactGroups() {
-  const data = await peopleFetch("GET", "/contactGroups?groupFields=metadata,name");
+  const data = await peopleFetch("GET", "/contactGroups?groupFields=metadata,name,groupType");
   return data.contactGroups || [];
 }
 
