@@ -172,6 +172,7 @@ export function SocialPage({ state, setState, actions }) {
                 onAddNote={(text) => actions.addNote(c.id, text)}
                 onDeleteNote={(nid) => actions.deleteNote(c.id, nid)}
                 onCreateContact={createContactInline}
+                onUpdateOtherContact={(otherId, patch) => actions.updateContact(otherId, patch)}
               />
             ))}
             {sorted.length === 0 && (
@@ -290,7 +291,7 @@ function RelationshipLinksView({ contacts }) {
 
 // ----------- Contact card -----------
 
-function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, onDelete, onAddNote, onDeleteNote, onCreateContact }) {
+function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, onDelete, onAddNote, onDeleteNote, onCreateContact, onUpdateOtherContact }) {
   const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [editLastSeen, setEditLastSeen] = useState(false);
   const [lastSeenVal, setLastSeenVal] = useState(c.lastSeen || "");
@@ -302,10 +303,13 @@ function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, 
   const [expandedNotes, setExpandedNotes] = useState(new Set());
   const [showEditModal, setShowEditModal] = useState(false);
   const [showKebab, setShowKebab] = useState(false);
-  const [showLinkPicker, setShowLinkPicker] = useState(false);
+  // activeLinkGroup: null = closed, string = open for that group name
+  const [activeLinkGroup, setActiveLinkGroup] = useState(null);
+  const [showNewGroupInput, setShowNewGroupInput] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
   const pickerRef = useRef(null);
   const kebabRef = useRef(null);
-  const linkPickerRef = useRef(null);
+  const linkSectionRef = useRef(null);
 
   useEffect(() => { setLastSeenVal(c.lastSeen || ""); }, [c.lastSeen]);
   useEffect(() => { setGiftVal(c.giftIdeas || ""); }, [c.giftIdeas]);
@@ -326,17 +330,29 @@ function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, 
   }, [showKebab]);
 
   useEffect(() => {
-    if (!showLinkPicker) return;
-    const h = (e) => { if (linkPickerRef.current && !linkPickerRef.current.contains(e.target)) setShowLinkPicker(false); };
+    if (activeLinkGroup === null) return;
+    const h = (e) => { if (linkSectionRef.current && !linkSectionRef.current.contains(e.target)) setActiveLinkGroup(null); };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
-  }, [showLinkPicker]);
+  }, [activeLinkGroup]);
 
   const contactGroups = c.groups || [];
   const bdayDays = daysUntilBirthday(c.birthday);
   const availableGroups = allGroups.filter((g) => !contactGroups.includes(g.id));
   const allContactsById = Object.fromEntries(allContacts.map((ct) => [ct.id, ct]));
   const linkedContacts = c.linkedContacts || [];
+
+  // Group links by their group name (empty string = ungrouped)
+  const linksByGroup = useMemo(() => {
+    const map = {};
+    linkedContacts.forEach((link) => {
+      const g = link.group || "";
+      if (!map[g]) map[g] = [];
+      map[g].push(link);
+    });
+    return map;
+  }, [linkedContacts]);
+  const linkGroupNames = Object.keys(linksByGroup);
 
   const addGroup = (gid) => { onUpdate({ groups: [...contactGroups, gid] }); setShowGroupPicker(false); };
   const removeGroup = (gid) => onUpdate({ groups: contactGroups.filter((id) => id !== gid) });
@@ -364,13 +380,33 @@ function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, 
     return next;
   });
 
-  const addLinkedContact = (id, relationship) => {
-    const next = [...linkedContacts, { id, relationship }];
-    onUpdate({ linkedContacts: next });
-    setShowLinkPicker(false);
+  const addLinkedContact = (id, relationship, group) => {
+    const myNext = [...linkedContacts, { id, relationship, group: group || null }];
+    onUpdate({ linkedContacts: myNext });
+    // Auto-create reverse link on the other contact if not already there
+    if (onUpdateOtherContact) {
+      const other = allContacts.find((ct) => ct.id === id);
+      if (other) {
+        const otherLinked = other.linkedContacts || [];
+        if (!otherLinked.some((l) => l.id === c.id)) {
+          onUpdateOtherContact(id, {
+            linkedContacts: [...otherLinked, { id: c.id, relationship: "", group: group || null }],
+          });
+        }
+      }
+    }
+    setActiveLinkGroup(null);
   };
   const removeLinkedContact = (id) => {
     onUpdate({ linkedContacts: linkedContacts.filter((l) => l.id !== id) });
+  };
+
+  const confirmNewGroup = () => {
+    const name = newGroupName.trim();
+    if (!name) return;
+    setActiveLinkGroup(name);
+    setShowNewGroupInput(false);
+    setNewGroupName("");
   };
 
   const PREVIEW = 90;
@@ -600,36 +636,67 @@ function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, 
       </div>
 
       {/* Linked contacts */}
-      <div className="contact-section" style={{ paddingTop: 8 }}>
+      <div className="contact-section" style={{ paddingTop: 8 }} ref={linkSectionRef}>
         <div className="contact-section-label">Linked contacts</div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 5 }}>
-          {linkedContacts.map((link) => {
-            const ct = allContactsById[link.id];
-            return ct ? (
-              <span key={link.id} className="linked-contact-pill">
-                <span className="linked-avatar">{initials(ct.name)}</span>
-                <span className="linked-name">{ct.name}</span>
-                {link.relationship && <span className="linked-rel">— {link.relationship}</span>}
-                <button className="group-tag-remove" onClick={() => removeLinkedContact(link.id)}>×</button>
-              </span>
-            ) : null;
-          })}
-          <div style={{ position: "relative" }} ref={linkPickerRef}>
-            <button className="add-group-btn" style={{ width: "auto", padding: "2px 8px", fontSize: 12, borderRadius: 6 }}
-              onClick={(e) => { e.stopPropagation(); setShowLinkPicker((v) => !v); }}>
-              + Link
-            </button>
-            {showLinkPicker && (
-              <LinkedContactPicker
-                allContacts={allContacts}
-                excludeIds={[c.id, ...linkedContacts.map((l) => l.id)]}
-                onSelect={addLinkedContact}
-                onClose={() => setShowLinkPicker(false)}
-                onCreateContact={onCreateContact}
-              />
-            )}
+
+        {/* Existing groups */}
+        {linkGroupNames.map((groupName) => (
+          <div key={groupName} className="link-group">
+            {groupName && <div className="link-group-label">{groupName}</div>}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5, alignItems: "center" }}>
+              {(linksByGroup[groupName] || []).map((link) => {
+                const ct = allContactsById[link.id];
+                return ct ? (
+                  <span key={link.id} className="linked-contact-pill">
+                    <span className="linked-avatar">{initials(ct.name)}</span>
+                    <span className="linked-name">{ct.name}</span>
+                    {link.relationship && <span className="linked-rel">— {link.relationship}</span>}
+                    <button className="group-tag-remove" onClick={() => removeLinkedContact(link.id)}>×</button>
+                  </span>
+                ) : null;
+              })}
+              <button className="add-group-btn" style={{ width: "auto", padding: "2px 8px", fontSize: 11.5, borderRadius: 6 }}
+                onClick={(e) => { e.stopPropagation(); setActiveLinkGroup(groupName); }}>
+                + Link
+              </button>
+            </div>
           </div>
-        </div>
+        ))}
+
+        {/* New group input */}
+        {showNewGroupInput ? (
+          <div className="link-group" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <input className="input input--xs" style={{ width: 140 }}
+              placeholder="Group name (e.g. Family)"
+              value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === "Enter") confirmNewGroup();
+                if (e.key === "Escape") { setShowNewGroupInput(false); setNewGroupName(""); }
+              }} />
+            <button className="btn btn-primary" style={{ fontSize: 11.5, padding: "3px 10px" }}
+              disabled={!newGroupName.trim()} onClick={confirmNewGroup}>Add</button>
+            <button className="btn-text" style={{ fontSize: 12 }}
+              onClick={() => { setShowNewGroupInput(false); setNewGroupName(""); }}>Cancel</button>
+          </div>
+        ) : (
+          <button className="link-new-group-btn"
+            onClick={(e) => { e.stopPropagation(); setShowNewGroupInput(true); }}>
+            + New link group
+          </button>
+        )}
+
+        {/* Link picker */}
+        {activeLinkGroup !== null && (
+          <LinkedContactPicker
+            groupName={activeLinkGroup}
+            allContacts={allContacts}
+            excludeIds={[c.id, ...linkedContacts.map((l) => l.id)]}
+            onSelect={(id, rel) => addLinkedContact(id, rel, activeLinkGroup)}
+            onClose={() => setActiveLinkGroup(null)}
+            onCreateContact={onCreateContact}
+          />
+        )}
       </div>
 
       {/* Notes — recent updates */}
@@ -677,7 +744,7 @@ function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, 
 
 // ----------- Linked contact picker -----------
 
-function LinkedContactPicker({ allContacts, excludeIds, onSelect, onClose, onCreateContact }) {
+function LinkedContactPicker({ groupName, allContacts, excludeIds, onSelect, onClose, onCreateContact }) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
   const [relationship, setRelationship] = useState("");
@@ -728,7 +795,12 @@ function LinkedContactPicker({ allContacts, excludeIds, onSelect, onClose, onCre
   }
 
   return (
-    <div className="link-picker-dropdown">
+    <div className="link-picker-inline">
+      {groupName && (
+        <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-3)", marginBottom: 8 }}>
+          {groupName}
+        </div>
+      )}
       {!selected ? (
         <>
           <input className="input input--xs" style={{ width: "100%", marginBottom: 6 }}
