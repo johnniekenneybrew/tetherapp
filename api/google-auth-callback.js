@@ -44,7 +44,39 @@ export default async function handler(req, res) {
 
     await saveRefreshToken(refresh_token);
 
-    res.redirect(302, "/?google_auth=success");
+    // Show token so it can be saved as GOOGLE_REFRESH_TOKEN env var in Vercel
+    const alreadySet = !!process.env.GOOGLE_REFRESH_TOKEN;
+    if (alreadySet) {
+      return res.redirect(302, "/?google_auth=success");
+    }
+
+    return res.send(`<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Google Tasks Connected</title>
+<style>
+  body { font-family: -apple-system, sans-serif; max-width: 520px; margin: 60px auto; padding: 0 20px; color: #111; }
+  h2 { font-size: 20px; margin-bottom: 8px; }
+  p  { color: #555; font-size: 14px; line-height: 1.5; margin-bottom: 16px; }
+  .token-box { background: #f4f4f5; border: 1px solid #e4e4e7; border-radius: 8px; padding: 12px 14px;
+               font-family: monospace; font-size: 13px; word-break: break-all; margin-bottom: 12px; }
+  button { background: #6C63FF; color: #fff; border: none; border-radius: 8px;
+           padding: 10px 18px; font-size: 14px; cursor: pointer; margin-right: 8px; }
+  button:hover { background: #5b52ee; }
+  a { color: #6C63FF; font-size: 14px; }
+  .note { font-size: 12px; color: #888; margin-top: 20px; }
+</style>
+</head>
+<body>
+  <h2>✓ Google Tasks connected</h2>
+  <p>Copy this refresh token and add it as <strong>GOOGLE_REFRESH_TOKEN</strong> in your
+     <a href="https://vercel.com" target="_blank">Vercel environment variables</a>.
+     Once set, the app will use it directly without touching Notion.</p>
+  <div class="token-box" id="token">${refresh_token}</div>
+  <button onclick="navigator.clipboard.writeText(document.getElementById('token').textContent).then(()=>this.textContent='Copied!')">Copy token</button>
+  <a href="/">Go to app →</a>
+  <p class="note">The token is also saved to Notion as a fallback if you skip this step.</p>
+</body>
+</html>`);
   } catch (err) {
     console.error("google-auth-callback error", err);
     res.redirect(302, `/?google_auth=error&reason=${encodeURIComponent(err.message)}`);
