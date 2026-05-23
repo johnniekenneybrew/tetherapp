@@ -58,8 +58,8 @@ export const habitsApi = {
 // Habit log
 // ============================================================
 export const habitLogApi = {
-  range:  (from, to)              => get("/habit-log", { from, to }),
-  toggle: (date, habitId, done)   => patch("/habit-log", { date, habitId, done }),
+  range:  (from, to)              => get("/habits", { log: 1, from, to }),
+  toggle: (date, habitId, done)   => patch("/habits", { log: 1, date, habitId, done }),
 };
 
 // ============================================================
@@ -76,8 +76,8 @@ export const routinesApi = {
 // Routine log
 // ============================================================
 export const routineLogApi = {
-  range:  (from, to)              => get("/routine-log", { from, to }),
-  toggle: (date, routineId, done) => patch("/routine-log", { date, routineId, done }),
+  range:  (from, to)              => get("/routines", { log: 1, from, to }),
+  toggle: (date, routineId, done) => patch("/routines", { log: 1, date, routineId, done }),
 };
 
 // ============================================================
@@ -123,10 +123,10 @@ export const contactGroupsApi = {
 // Goal tasks (separate from to-do list)
 // ============================================================
 export const goalTasksApi = {
-  list:   ()           => get("/goal-tasks"),
-  create: (data)       => post("/goal-tasks", data),
-  update: (id, patch_) => patch("/goal-tasks", { id, ...patch_ }),
-  delete: (id)         => del("/goal-tasks", { id }),
+  list:   ()           => get("/goals", { tasks: 1 }),
+  create: (data)       => post("/goals", { tasks: 1, ...data }),
+  update: (id, patch_) => patch("/goals", { tasks: 1, id, ...patch_ }),
+  delete: (id)         => del("/goals", { tasks: 1, id }),
 };
 
 // ============================================================
@@ -141,7 +141,7 @@ export const prefsApi = {
 // Google Tasks integration
 // ============================================================
 export const googleTasksApi = {
-  status:     () => get("/google-status"),
+  status:     () => get("/google-sync"),
   sync:       () => post("/google-sync", {}),
-  disconnect: () => post("/google-disconnect", {}),
+  disconnect: () => del("/google-sync", {}),
 };

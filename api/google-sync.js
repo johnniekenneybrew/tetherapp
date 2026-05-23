@@ -1,5 +1,5 @@
 import { notion, DB, P, p, queryAll, setCors } from "./_notion.js";
-import { isConnected, gtCreate, gtUpdate, gtDelete, gtListAll } from "./_google-tasks.js";
+import { isConnected, clearRefreshToken, gtCreate, gtUpdate, gtDelete, gtListAll } from "./_google-tasks.js";
 
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
 
@@ -134,6 +134,19 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
 
   try {
+    // GET → connection status (replaces google-status.js)
+    if (req.method === "GET") {
+      const connected = await isConnected();
+      return res.json({ connected });
+    }
+
+    // DELETE → disconnect (replaces google-disconnect.js)
+    if (req.method === "DELETE") {
+      await clearRefreshToken();
+      return res.json({ ok: true });
+    }
+
+    // POST → run sync
     const connected = await isConnected();
     if (!connected) return res.json({ ok: true, skipped: true, reason: "not_connected" });
 

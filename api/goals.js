@@ -47,11 +47,62 @@ function toGoal(page) {
   };
 }
 
+// ── Goal Tasks (merged to stay under Vercel Hobby 12-function limit) ─────────
+
+function toGoalTask(page) {
+  return {
+    _pageId: page.id,
+    id:      page.id,
+    name:    p.title(page.properties.Name),
+    done:    p.checkbox(page.properties.Done),
+  };
+}
+
+async function handleGoalTasks(req, res) {
+  const dbId = await getGoalTasksDbId();
+  if (req.method === "GET") {
+    const [active, done] = await Promise.all([
+      queryAll(dbId, { property: "Done", checkbox: { equals: false } }),
+      queryAll(dbId, { property: "Done", checkbox: { equals: true } }),
+    ]);
+    return res.json([...active, ...done].map(toGoalTask));
+  }
+  if (req.method === "POST") {
+    const { name } = req.body;
+    if (!name?.trim()) return res.status(400).json({ error: "name required" });
+    const page = await notion.pages.create({
+      parent: { database_id: dbId },
+      properties: { Name: P.title(name.trim()), Done: P.checkbox(false) },
+    });
+    return res.json(toGoalTask(page));
+  }
+  if (req.method === "PATCH") {
+    const { id, ...patch } = req.body;
+    if (!id) return res.status(400).json({ error: "id required" });
+    const updates = {};
+    if (patch.name !== undefined) updates.Name = P.title(patch.name);
+    if (patch.done !== undefined) updates.Done = P.checkbox(!!patch.done);
+    const page = await notion.pages.update({ page_id: id, properties: updates });
+    return res.json(toGoalTask(page));
+  }
+  if (req.method === "DELETE") {
+    const { id } = req.body;
+    if (!id) return res.status(400).json({ error: "id required" });
+    await notion.pages.update({ page_id: id, archived: true });
+    return res.json({ ok: true });
+  }
+  return res.status(405).json({ error: "Method not allowed" });
+}
+
+// ── Goals ─────────────────────────────────────────────────────────────────────
+
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === "OPTIONS") return res.status(200).end();
 
   try {
+    if (req.query.tasks) return handleGoalTasks(req, res);
+
     await ensureGoalSchema();
 
     if (req.method === "GET") {
