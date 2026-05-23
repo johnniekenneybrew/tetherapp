@@ -728,6 +728,59 @@ textarea.input.is-filled--green {
   margin: 8px 12px;
 }
 
+.todo.is-selected {
+  background: rgba(108, 99, 255, 0.05);
+  border-color: rgba(108, 99, 255, 0.3);
+}
+
+.todo-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 200;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  min-width: 160px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+.todo-menu button {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text);
+  border-radius: 6px;
+  width: 100%;
+}
+.todo-menu button:hover { background: var(--surface-2); }
+.todo-menu button.is-danger { color: var(--error); }
+.todo-menu-sep {
+  height: 1px;
+  background: var(--border-soft);
+  margin: 3px 8px;
+}
+
+.bulk-bar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.14);
+  z-index: 300;
+  white-space: nowrap;
+  animation: toast-in 0.18s ease;
+}
+
 /* ----------------- Habits table ----------------- */
 
 .habits-table {
