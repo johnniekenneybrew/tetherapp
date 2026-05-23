@@ -32,24 +32,48 @@ export default async function handler(req, res) {
 
     if (req.method === "GET") {
       const { contactId } = req.query;
-      if (!contactId) return res.status(400).json({ error: "contactId required" });
 
-      const contact = await getContact(contactId);
-      const userDefined = contact.userDefined || [];
+      if (contactId) {
+        // Get notes for specific contact
+        const contact = await getContact(contactId);
+        const userDefined = contact.userDefined || [];
 
-      // Extract all note_* fields
-      const notes = [];
-      for (const field of userDefined) {
-        const key = field.metadata?.userDefined?.key || "";
-        if (key.startsWith("note_")) {
-          notes.push(toNote(contactId, key, field.value));
+        // Extract all note_* fields
+        const notes = [];
+        for (const field of userDefined) {
+          const key = field.metadata?.userDefined?.key || "";
+          if (key.startsWith("note_")) {
+            notes.push(toNote(contactId, key, field.value));
+          }
         }
+
+        // Sort by timestamp descending (newest first)
+        notes.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        return res.json(notes);
+      } else {
+        // Get all notes from all contacts
+        const { listContacts } = await import("./_google-people.js");
+        const allContacts = await listContacts();
+        const allNotes = [];
+
+        for (const contact of allContacts) {
+          const cId = contact.resourceName;
+          const userDefined = contact.userDefined || [];
+
+          for (const field of userDefined) {
+            const key = field.metadata?.userDefined?.key || "";
+            if (key.startsWith("note_")) {
+              allNotes.push(toNote(cId, key, field.value));
+            }
+          }
+        }
+
+        // Sort by timestamp descending
+        allNotes.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        return res.json(allNotes);
       }
-
-      // Sort by timestamp descending (newest first)
-      notes.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-      return res.json(notes);
     }
 
     if (req.method === "POST") {
