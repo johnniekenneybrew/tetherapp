@@ -146,11 +146,15 @@ export default async function handler(req, res) {
       const { id } = req.body;
       if (!id) return res.status(400).json({ error: "id required" });
 
-      console.log("DELETE contact-group id:", id);
-      await deleteContactGroup(id);
-      await deleteIconFromNotion(id);
-
-      return res.json({ ok: true });
+      try {
+        await deleteContactGroup(id);
+        await deleteIconFromNotion(id);
+        console.log("DELETE contact-group OK:", id);
+        return res.json({ ok: true });
+      } catch (deleteErr) {
+        console.log("DELETE contact-group FAILED:", id, "|", deleteErr.message.slice(0, 300));
+        return res.status(500).json({ error: deleteErr.message });
+      }
     }
 
     return res.status(405).json({ error: "Method not allowed" });
