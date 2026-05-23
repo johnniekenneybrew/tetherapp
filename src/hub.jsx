@@ -4,6 +4,7 @@ import {
   Checkbox, AccountDot, StatusBadge, Icon,
 } from './shared';
 import { useOrder } from './useOrder';
+import { googleTasksApi } from './api';
 
 // ============================================================
 // Habits + Health hub
@@ -1044,6 +1045,40 @@ export function SettingsTab({ state, setState }) {
     }));
   };
 
+  const [gtConnected, setGtConnected] = useState(null); // null=loading, true, false
+  const [gtSyncing, setGtSyncing] = useState(false);
+  const [gtMessage, setGtMessage] = useState(null);
+
+  useEffect(() => {
+    googleTasksApi.status()
+      .then(({ connected }) => setGtConnected(connected))
+      .catch(() => setGtConnected(false));
+  }, []);
+
+  const handleGtSync = async () => {
+    setGtSyncing(true);
+    setGtMessage(null);
+    try {
+      const result = await googleTasksApi.sync();
+      setGtMessage(result?.skipped ? "Not connected" : `Synced ${result?.synced ?? 0} item(s)`);
+    } catch (e) {
+      setGtMessage("Sync failed: " + e.message);
+    } finally {
+      setGtSyncing(false);
+    }
+  };
+
+  const handleGtDisconnect = async () => {
+    if (!confirm("Disconnect Google Tasks? Tasks already synced will remain in Notion.")) return;
+    try {
+      await googleTasksApi.disconnect();
+      setGtConnected(false);
+      setGtMessage("Disconnected");
+    } catch (e) {
+      setGtMessage("Error: " + e.message);
+    }
+  };
+
   return (
     <div style={{ maxWidth: 640 }}>
       {/* Areas */}
@@ -1094,15 +1129,71 @@ export function SettingsTab({ state, setState }) {
         <div style={{ height: 1, background: "var(--border-soft)" }} />
 
         {/* Google Tasks */}
-        <div style={{ padding: "16px 20px", opacity: 0.6 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ padding: "16px 20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
             <GoogleTasksIcon />
             <span style={{ fontWeight: 600, fontSize: 14 }}>Google Tasks</span>
-            <span className="badge badge--grey" style={{ marginLeft: "auto" }}>Coming soon</span>
+            {gtConnected === null && (
+              <span className="badge badge--grey" style={{ marginLeft: "auto" }}>Checking…</span>
+            )}
+            {gtConnected === true && (
+              <span className="badge badge--green" style={{ marginLeft: "auto" }}>
+                <Icon.Check /> Connected
+              </span>
+            )}
+            {gtConnected === false && (
+              <span className="badge badge--grey" style={{ marginLeft: "auto" }}>Not connected</span>
+            )}
           </div>
-          <p className="tiny" style={{ marginTop: 8, color: "var(--text-3)" }}>
-            Sync your Google Tasks lists directly into the To-Do view.
+
+          <p className="tiny" style={{ marginBottom: 12, color: "var(--text-2)" }}>
+            Bidirectional sync with your Google Tasks default list. Tasks created in Tether
+            appear on your phone; tasks added from Google appear here automatically.
           </p>
+
+          {gtMessage && (
+            <p className="tiny" style={{ marginBottom: 10, color: gtMessage.startsWith("Error") || gtMessage.startsWith("Sync failed") ? "var(--error)" : "var(--text-2)" }}>
+              {gtMessage}
+            </p>
+          )}
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {gtConnected === false && (
+              <a
+                href="/api/google-auth"
+                className="btn btn-primary"
+                style={{ fontSize: 13, textDecoration: "none" }}>
+                Connect Google Tasks
+              </a>
+            )}
+            {gtConnected === true && (
+              <>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleGtSync}
+                  disabled={gtSyncing}
+                  style={{ fontSize: 13 }}>
+                  {gtSyncing ? "Syncing…" : "Sync now"}
+                </button>
+                <button
+                  className="btn"
+                  onClick={handleGtDisconnect}
+                  style={{ fontSize: 13, color: "var(--text-3)" }}>
+                  Disconnect
+                </button>
+              </>
+            )}
+          </div>
+
+          {gtConnected === false && (
+            <p className="tiny" style={{ marginTop: 10, color: "var(--text-3)" }}>
+              You'll need to add <code style={{ fontSize: 11 }}>GOOGLE_CLIENT_ID</code> and{" "}
+              <code style={{ fontSize: 11 }}>GOOGLE_CLIENT_SECRET</code> as Vercel environment variables,
+              and set the redirect URI to{" "}
+              <code style={{ fontSize: 11 }}>https://to-tether.app/api/google-auth-callback</code>{" "}
+              in your Google Cloud Console OAuth client.
+            </p>
+          )}
         </div>
       </div>
     </div>

@@ -136,3 +136,12 @@ export const prefsApi = {
   get: (key, userId) => get("/prefs", { key, userId }),
   set: (key, value, userId) => post("/prefs", { key, value, userId }),
 };
+
+// ============================================================
+// Google Tasks integration
+// ============================================================
+export const googleTasksApi = {
+  status:     () => get("/google-status"),
+  sync:       () => post("/google-sync", {}),
+  disconnect: () => post("/google-disconnect", {}),
+};
