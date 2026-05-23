@@ -348,10 +348,9 @@ function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, 
   const [expandedNotes, setExpandedNotes] = useState(new Set());
   const [showEditModal, setShowEditModal] = useState(false);
   const [showKebab, setShowKebab] = useState(false);
-  // activeLinkGroup: null = closed, string = open for that group name
+  // activeLinkGroup: null = closed, "" = new ungrouped, string = adding to existing group
   const [activeLinkGroup, setActiveLinkGroup] = useState(null);
-  const [showNewGroupInput, setShowNewGroupInput] = useState(false);
-  const [newGroupName, setNewGroupName] = useState("");
+  const [showLinkPicker, setShowLinkPicker] = useState(false);
   const pickerRef = useRef(null);
   const kebabRef = useRef(null);
   const linkSectionRef = useRef(null);
@@ -375,11 +374,11 @@ function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, 
   }, [showKebab]);
 
   useEffect(() => {
-    if (activeLinkGroup === null) return;
-    const h = (e) => { if (linkSectionRef.current && !linkSectionRef.current.contains(e.target)) setActiveLinkGroup(null); };
+    if (!showLinkPicker && activeLinkGroup === null) return;
+    const h = (e) => { if (linkSectionRef.current && !linkSectionRef.current.contains(e.target)) { setShowLinkPicker(false); setActiveLinkGroup(null); } };
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
-  }, [activeLinkGroup]);
+  }, [showLinkPicker, activeLinkGroup]);
 
   const contactGroups = c.groups || [];
   const bdayDays = daysUntilBirthday(c.birthday);
@@ -446,13 +445,6 @@ function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, 
     onUpdate({ linkedContacts: linkedContacts.filter((l) => l.id !== id) });
   };
 
-  const confirmNewGroup = () => {
-    const name = newGroupName.trim();
-    if (!name) return;
-    setActiveLinkGroup(name);
-    setShowNewGroupInput(false);
-    setNewGroupName("");
-  };
 
   const PREVIEW = 90;
   const inits = initials(c.name);
@@ -705,46 +697,29 @@ function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, 
                 ) : null;
               })}
               <button className="add-group-btn" style={{ width: "auto", padding: "2px 8px", fontSize: 11.5, borderRadius: 6 }}
-                onClick={(e) => { e.stopPropagation(); setActiveLinkGroup(groupName); }}>
+                onClick={(e) => { e.stopPropagation(); setActiveLinkGroup(groupName); setShowLinkPicker(true); }}>
                 + Link
               </button>
             </div>
           </div>
         ))}
 
-        {/* New group input */}
-        {showNewGroupInput ? (
-          <div className="link-group" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <input className="input input--xs" style={{ width: 140 }}
-              placeholder="Group name (e.g. Family)"
-              value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)}
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === "Enter") confirmNewGroup();
-                if (e.key === "Escape") { setShowNewGroupInput(false); setNewGroupName(""); }
-              }} />
-            <button className="btn btn-primary" style={{ fontSize: 11.5, padding: "3px 10px" }}
-              disabled={!newGroupName.trim()} onClick={confirmNewGroup}>Add</button>
-            <button className="btn-text" style={{ fontSize: 12 }}
-              onClick={() => { setShowNewGroupInput(false); setNewGroupName(""); }}>Cancel</button>
-          </div>
-        ) : (
-          <button className="link-new-group-btn"
-            onClick={(e) => { e.stopPropagation(); setShowNewGroupInput(true); }}>
-            + New link group
-          </button>
-        )}
-
-        {/* Link picker */}
-        {activeLinkGroup !== null && (
+        {/* Link picker — triggered by "+ Link contact" or per-group "+ Link" */}
+        {showLinkPicker ? (
           <LinkedContactPicker
             groupName={activeLinkGroup}
+            existingGroupNames={linkGroupNames.filter(Boolean)}
             allContacts={allContacts}
             excludeIds={[c.id, ...linkedContacts.map((l) => l.id)]}
-            onSelect={(id, rel) => addLinkedContact(id, rel, activeLinkGroup)}
-            onClose={() => setActiveLinkGroup(null)}
+            onSelect={(id, rel, group) => { addLinkedContact(id, rel, group); setShowLinkPicker(false); setActiveLinkGroup(null); }}
+            onClose={() => { setShowLinkPicker(false); setActiveLinkGroup(null); }}
             onCreateContact={onCreateContact}
           />
+        ) : (
+          <button className="link-new-group-btn"
+            onClick={(e) => { e.stopPropagation(); setActiveLinkGroup(null); setShowLinkPicker(true); }}>
+            + Link contact
+          </button>
         )}
       </div>
 
@@ -793,12 +768,12 @@ function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, 
 
 // ----------- Linked contact picker -----------
 
-function LinkedContactPicker({ groupName, allContacts, excludeIds, onSelect, onClose, onCreateContact }) {
+function LinkedContactPicker({ groupName: initialGroupName, existingGroupNames = [], allContacts, excludeIds, onSelect, onClose, onCreateContact }) {
+  const [step, setStep] = useState("search"); // "search" | "relationship" | "group"
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
   const [relationship, setRelationship] = useState("");
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newName, setNewName] = useState("");
+  const [groupName, setGroupName] = useState(initialGroupName ?? "");
   const [creating, setCreating] = useState(false);
 
   const filtered = allContacts.filter((c) =>
@@ -806,116 +781,137 @@ function LinkedContactPicker({ groupName, allContacts, excludeIds, onSelect, onC
     (!search || c.name.toLowerCase().includes(search.toLowerCase()))
   );
 
-  if (showCreateForm) {
+  const handleSelectContact = (contact) => {
+    setSelected(contact);
+    setStep("relationship");
+  };
+
+  const handleCreateContact = async () => {
+    if (!search.trim() || !onCreateContact) return;
+    setCreating(true);
+    const created = await onCreateContact(search.trim());
+    setCreating(false);
+    if (created) handleSelectContact(created);
+  };
+
+  const handleRelationship = (rel) => {
+    const finalRel = rel || relationship.trim();
+    setRelationship(finalRel);
+    // If group was pre-set (clicking "+ Link" inside a group), skip group step
+    if (initialGroupName !== undefined && initialGroupName !== null) {
+      onSelect(selected.id, finalRel, initialGroupName);
+    } else {
+      setStep("group");
+    }
+  };
+
+  const handleFinish = (skipGroup) => {
+    onSelect(selected.id, relationship, skipGroup ? null : groupName.trim() || null);
+  };
+
+  // Step 1: Search
+  if (step === "search") {
     return (
-      <div className="link-picker-dropdown">
-        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>Create new contact</div>
-        <input className="input input--xs" style={{ width: "100%", marginBottom: 8 }}
-          placeholder="Full name"
-          value={newName} onChange={(e) => setNewName(e.target.value)}
-          autoFocus
-          onKeyDown={async (e) => {
-            if (e.key === "Enter" && newName.trim() && onCreateContact) {
-              setCreating(true);
-              const created = await onCreateContact(newName.trim());
-              if (created) setSelected(created);
-              setCreating(false);
-              setShowCreateForm(false);
-            }
-            if (e.key === "Escape") setShowCreateForm(false);
-          }} />
-        <div style={{ display: "flex", gap: 6 }}>
-          <button className="btn btn-primary" style={{ fontSize: 12, padding: "3px 10px" }}
-            disabled={!newName.trim() || creating}
-            onClick={async () => {
-              if (!onCreateContact) return;
-              setCreating(true);
-              const created = await onCreateContact(newName.trim());
-              if (created) setSelected(created);
-              setCreating(false);
-              setShowCreateForm(false);
-            }}>
-            {creating ? "Creating…" : "Create"}
-          </button>
-          <button className="btn-text" style={{ fontSize: 12 }} onClick={() => { setShowCreateForm(false); setNewName(""); }}>Back</button>
+      <div className="link-picker-inline">
+        <input className="input input--xs" style={{ width: "100%", marginBottom: 6 }}
+          placeholder="Search contacts…" value={search}
+          onChange={(e) => setSearch(e.target.value)} autoFocus
+          onKeyDown={(e) => { if (e.key === "Escape") onClose(); }} />
+        <div style={{ maxHeight: 160, overflowY: "auto" }}>
+          {filtered.map((c) => (
+            <button key={c.id} onClick={() => handleSelectContact(c)}
+              style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "6px 8px", borderRadius: 6, background: "none", border: "none", cursor: "pointer", textAlign: "left", fontSize: 13 }}
+              onMouseEnter={(e) => e.currentTarget.style.background = "var(--surface-2)"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "none"}>
+              <span style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--surface-2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 600, flexShrink: 0 }}>
+                {initials(c.name)}
+              </span>
+              {c.name}
+            </button>
+          ))}
+          {filtered.length === 0 && search && (
+            <div className="tiny" style={{ padding: "4px 8px", color: "var(--text-3)" }}>No contacts found</div>
+          )}
+        </div>
+        <div style={{ borderTop: "1px solid var(--border-soft)", marginTop: 4, paddingTop: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          {onCreateContact && search.trim() ? (
+            <button onClick={handleCreateContact} disabled={creating}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 8px", borderRadius: 6, background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "var(--accent)" }}>
+              <Icon.Plus /> {creating ? "Creating…" : `Create "${search}"`}
+            </button>
+          ) : <span />}
+          <button className="btn-text" style={{ fontSize: 12 }} onClick={onClose}>Cancel</button>
         </div>
       </div>
     );
   }
 
+  // Step 2: Relationship
+  if (step === "relationship") {
+    return (
+      <div className="link-picker-inline">
+        <div style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 10 }}>
+          Linking <strong>{selected.name}</strong>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 10 }}>
+          {QUICK_REL_TYPES.map((t) => (
+            <button key={t} onClick={() => { setRelationship(t); handleRelationship(t); }}
+              style={{ padding: "3px 9px", border: "1px solid var(--border)", borderRadius: 999, fontSize: 11.5, cursor: "pointer", background: "none", color: "var(--text-2)", transition: "all 120ms" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--text)"; e.currentTarget.style.color = "#fff"; e.currentTarget.style.borderColor = "var(--text)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "var(--text-2)"; e.currentTarget.style.borderColor = "var(--border)"; }}>
+              {t}
+            </button>
+          ))}
+        </div>
+        <input className="input input--xs" style={{ width: "100%", marginBottom: 8 }}
+          placeholder="Or type custom (e.g. Mom, Business partner)"
+          value={relationship} onChange={(e) => setRelationship(e.target.value)}
+          autoFocus
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleRelationship(relationship);
+            if (e.key === "Escape") setStep("search");
+          }} />
+        <div style={{ display: "flex", gap: 6 }}>
+          <button className="btn btn-primary" style={{ fontSize: 12, padding: "3px 10px" }}
+            onClick={() => handleRelationship(relationship)}>
+            {initialGroupName !== undefined && initialGroupName !== null ? "Link" : "Next"}
+          </button>
+          <button className="btn-text" style={{ fontSize: 12 }} onClick={() => setStep("search")}>Back</button>
+        </div>
+      </div>
+    );
+  }
+
+  // Step 3: Group (optional)
   return (
     <div className="link-picker-inline">
-      {groupName && (
-        <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-3)", marginBottom: 8 }}>
-          {groupName}
+      <div style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 8 }}>
+        Add <strong>{selected.name}</strong> to a group? <span style={{ color: "var(--text-3)", fontStyle: "italic" }}>optional</span>
+      </div>
+      {existingGroupNames.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 8 }}>
+          {existingGroupNames.map((g) => (
+            <button key={g} onClick={() => setGroupName(groupName === g ? "" : g)}
+              style={{ padding: "3px 9px", border: `1px solid ${groupName === g ? "var(--accent)" : "var(--border)"}`, borderRadius: 999, fontSize: 11.5, cursor: "pointer", background: groupName === g ? "var(--accent)" : "none", color: groupName === g ? "#fff" : "var(--text-2)" }}>
+              {g}
+            </button>
+          ))}
         </div>
       )}
-      {!selected ? (
-        <>
-          <input className="input input--xs" style={{ width: "100%", marginBottom: 6 }}
-            placeholder="Search contacts…" value={search}
-            onChange={(e) => setSearch(e.target.value)} autoFocus />
-          <div style={{ maxHeight: 160, overflowY: "auto" }}>
-            {filtered.length === 0 && (
-              <div className="tiny" style={{ padding: "6px 4px", color: "var(--text-3)" }}>No contacts found</div>
-            )}
-            {filtered.map((c) => (
-              <button key={c.id} onClick={() => setSelected(c)}
-                style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "6px 8px", borderRadius: 6, background: "none", border: "none", cursor: "pointer", textAlign: "left", fontSize: 13 }}
-                onMouseEnter={(e) => e.currentTarget.style.background = "var(--surface-2)"}
-                onMouseLeave={(e) => e.currentTarget.style.background = "none"}>
-                <span style={{ width: 22, height: 22, borderRadius: "50%", background: "var(--surface-2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 600, flexShrink: 0 }}>
-                  {initials(c.name)}
-                </span>
-                {c.name}
-              </button>
-            ))}
-          </div>
-          {onCreateContact && (
-            <div style={{ borderTop: "1px solid var(--border-soft)", marginTop: 4, paddingTop: 6 }}>
-              <button onClick={() => { setShowCreateForm(true); setNewName(search); }}
-                style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "5px 8px", borderRadius: 6, background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "var(--accent)" }}>
-                <Icon.Plus /> New contact{search ? ` "${search}"` : ""}
-              </button>
-            </div>
-          )}
-        </>
-      ) : (
-        <div>
-          <div style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 10 }}>
-            Linking <strong>{selected.name}</strong> — choose relationship:
-          </div>
-          {/* Quick type pills */}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 10 }}>
-            {QUICK_REL_TYPES.map((t) => (
-              <button key={t}
-                onClick={() => { setRelationship(t); onSelect(selected.id, t); }}
-                style={{
-                  padding: "3px 9px", border: "1px solid var(--border)", borderRadius: 999,
-                  fontSize: 11.5, cursor: "pointer", background: "none", color: "var(--text-2)",
-                  transition: "all 120ms",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "var(--text)"; e.currentTarget.style.color = "#fff"; e.currentTarget.style.borderColor = "var(--text)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "var(--text-2)"; e.currentTarget.style.borderColor = "var(--border)"; }}>
-                {t}
-              </button>
-            ))}
-          </div>
-          <input className="input input--xs" style={{ width: "100%", marginBottom: 8 }}
-            placeholder="Or type custom (e.g. Mom, Business partner)"
-            value={relationship} onChange={(e) => setRelationship(e.target.value)}
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === "Enter") onSelect(selected.id, relationship.trim());
-              if (e.key === "Escape") setSelected(null);
-            }} />
-          <div style={{ display: "flex", gap: 6 }}>
-            <button className="btn btn-primary" style={{ fontSize: 12, padding: "3px 10px" }}
-              onClick={() => onSelect(selected.id, relationship.trim())}>Link</button>
-            <button className="btn-text" style={{ fontSize: 12 }} onClick={() => setSelected(null)}>Back</button>
-          </div>
-        </div>
-      )}
+      <input className="input input--xs" style={{ width: "100%", marginBottom: 8 }}
+        placeholder="Group name (e.g. Family, NYC Friends)"
+        value={groupName} onChange={(e) => setGroupName(e.target.value)}
+        autoFocus
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleFinish(false);
+          if (e.key === "Escape") setStep("relationship");
+        }} />
+      <div style={{ display: "flex", gap: 6 }}>
+        <button className="btn btn-primary" style={{ fontSize: 12, padding: "3px 10px" }}
+          onClick={() => handleFinish(false)}>Link</button>
+        <button className="btn-text" style={{ fontSize: 12 }} onClick={() => handleFinish(true)}>Skip</button>
+        <button className="btn-text" style={{ fontSize: 12 }} onClick={() => setStep("relationship")}>Back</button>
+      </div>
     </div>
   );
 }
