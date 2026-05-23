@@ -146,6 +146,7 @@ export default async function handler(req, res) {
       const { id } = req.body;
       if (!id) return res.status(400).json({ error: "id required" });
 
+      console.log("DELETE contact-group id:", id);
       await deleteContactGroup(id);
       await deleteIconFromNotion(id);
 

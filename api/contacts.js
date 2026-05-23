@@ -127,7 +127,6 @@ export default async function handler(req, res) {
       if (!id) return res.status(400).json({ error: "id required" });
 
       const existing = await getContact(id);
-      const updated = toGooglePerson(patch, existing);
 
       // Handle group membership changes
       if (patch.groups !== undefined) {
@@ -138,16 +137,29 @@ export default async function handler(req, res) {
         const toAdd = (patch.groups || []).filter(g => !oldGroups.includes(g));
         const toRemove = oldGroups.filter(g => !(patch.groups || []).includes(g));
 
+        console.log("group changes — add:", toAdd, "remove:", toRemove);
         for (const groupId of toAdd) {
-          await addContactToGroup(id, groupId).catch(() => {});
+          await addContactToGroup(id, groupId).catch((e) => console.error("addToGroup failed", groupId, e.message));
         }
         for (const groupId of toRemove) {
-          await removeContactFromGroup(id, groupId).catch(() => {});
+          await removeContactFromGroup(id, groupId).catch((e) => console.error("removeFromGroup failed", groupId, e.message));
         }
       }
 
-      const result = await updateContact(id, updated);
-      return res.json(toContact(result));
+      // Only call updateContact if non-group/non-linkedContacts fields are being changed.
+      // Skipping this when only groups change avoids: (1) clearing the contact name with an empty
+      // partial patch, and (2) an etag conflict caused by the membership modifications above.
+      const contactFieldKeys = Object.keys(patch).filter(k => k !== "groups" && k !== "linkedContacts");
+      if (contactFieldKeys.length > 0) {
+        // Re-fetch to get the fresh etag after any membership modifications
+        const fresh = await getContact(id);
+        const updated = toGooglePerson(patch, fresh);
+        const result = await updateContact(id, updated);
+        return res.json(toContact(result));
+      }
+
+      const refreshed = await getContact(id);
+      return res.json(toContact(refreshed));
     }
 
     if (req.method === "DELETE") {
