@@ -182,7 +182,7 @@ export function TopBar({ route, setRoute, dateLabel, onHubTab }) {
   return (
     <header className="topbar">
       <div className="topbar-inner">
-        <div className="brand" onClick={() => setRoute({ page: "checkin" })} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+        <div className="brand" onClick={() => setRoute({ page: "checkin" })} style={{ cursor: "pointer" }}>
           <svg width="120" height="32" viewBox="0 0 160 40" fill="none" xmlns="http://www.w3.org/2000/svg">
             <line x1="8" y1="20" x2="20" y2="8" stroke="#6C63FF" strokeWidth="2" strokeLinecap="round"/>
             <line x1="20" y1="8" x2="32" y2="20" stroke="#6C63FF" strokeWidth="2" strokeLinecap="round"/>
@@ -196,11 +196,6 @@ export function TopBar({ route, setRoute, dateLabel, onHubTab }) {
               <tspan fontWeight="300">teth</tspan><tspan fontWeight="600">er</tspan>
             </text>
           </svg>
-          <span style={{
-            fontSize: 9.5, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase",
-            color: "#6C63FF", background: "rgba(108,99,255,0.1)", border: "1px solid rgba(108,99,255,0.25)",
-            borderRadius: 4, padding: "1px 5px", lineHeight: 1.4, alignSelf: "flex-start", marginTop: 6,
-          }}>beta</span>
         </div>
         <nav className="nav">
           {items.map((it) => {
@@ -253,8 +248,16 @@ export function TopBar({ route, setRoute, dateLabel, onHubTab }) {
             {rightItems.map((it) => (
               <button key={it.id}
                 className={route.page === it.id ? "active" : ""}
-                onClick={() => setRoute({ page: it.id })}>
+                onClick={() => setRoute({ page: it.id })}
+                style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 {it.label}
+                {it.id === "todo" && (
+                  <span style={{
+                    fontSize: 8.5, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
+                    color: "#6C63FF", background: "rgba(108,99,255,0.15)", border: "1px solid rgba(108,99,255,0.3)",
+                    borderRadius: 3, padding: "1px 4px", lineHeight: 1.2,
+                  }}>beta</span>
+                )}
               </button>
             ))}
           </nav>
