@@ -1558,7 +1558,7 @@ textarea.input.is-filled--green {
   transition: border-color var(--t-fast);
 }
 .contact-card:hover { border-color: #D4D4D8; }
-.contact-card--compact { overflow: hidden; }
+.contact-card--compact { overflow: visible; }
 
 .contact-row {
   display: flex;
@@ -1848,8 +1848,36 @@ textarea.input.is-filled--green {
   border-radius: var(--r-md);
   box-shadow: var(--shadow-pop);
   z-index: 300;
-  min-width: 220px;
+  min-width: 240px;
   padding: 10px;
+}
+
+/* Relationship networks view */
+.network-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.network-member {
+  min-width: 140px;
+  flex: 1 1 140px;
+  max-width: 220px;
+}
+.network-link-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  padding: 1px 0 1px 2px;
+}
+.network-rel {
+  color: var(--text-3);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.network-target {
+  color: var(--text-2);
+  font-weight: 500;
 }
 
 /* Manage groups modal */

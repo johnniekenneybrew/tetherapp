@@ -7,9 +7,10 @@ async function ensureContactSchema() {
   try {
     const db = await notion.databases.retrieve({ database_id: DB.CONTACTS });
     const updates = {};
-    if (!db.properties.From)             updates.From              = { rich_text: {} };
-    if (!db.properties.Context)          updates.Context           = { rich_text: {} };
+    if (!db.properties.From)              updates.From              = { rich_text: {} };
+    if (!db.properties.Context)           updates.Context           = { rich_text: {} };
     if (!db.properties["Linked Contacts"]) updates["Linked Contacts"] = { rich_text: {} };
+    if (!db.properties["Introduced By"]) updates["Introduced By"]  = { rich_text: {} };
     if (Object.keys(updates).length > 0) {
       await notion.databases.update({ database_id: DB.CONTACTS, properties: updates });
     }
@@ -39,6 +40,7 @@ function toContact(page) {
     tags:           p.mselect(props.Tags),
     context:        p.rich(props.Context) || "",
     linkedContacts: parseLinked(p.rich(props["Linked Contacts"])),
+    introducedBy:   p.rich(props["Introduced By"]) || "",
     notes: [],
   };
 }
@@ -56,7 +58,7 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "POST") {
-      const { name, from, city, birthday, groups, lastSeen, giftIdeas, tags, context, linkedContacts } = req.body;
+      const { name, from, city, birthday, groups, lastSeen, giftIdeas, tags, context, linkedContacts, introducedBy } = req.body;
       const page = await notion.pages.create({
         parent: { database_id: DB.CONTACTS },
         properties: {
@@ -70,6 +72,7 @@ export default async function handler(req, res) {
           Tags:               P.mselect(tags || []),
           Context:            P.rich(context || ""),
           "Linked Contacts":  P.rich(JSON.stringify(linkedContacts || [])),
+          "Introduced By":    P.rich(introducedBy || ""),
         },
       });
       return res.json(toContact(page));
@@ -90,6 +93,7 @@ export default async function handler(req, res) {
       if (patch.tags           !== undefined) updates.Tags              = P.mselect(patch.tags || []);
       if (patch.context        !== undefined) updates.Context           = P.rich(patch.context || "");
       if (patch.linkedContacts !== undefined) updates["Linked Contacts"] = P.rich(JSON.stringify(patch.linkedContacts || []));
+      if (patch.introducedBy   !== undefined) updates["Introduced By"]  = P.rich(patch.introducedBy || "");
 
       const page = await notion.pages.update({ page_id: id, properties: updates });
       return res.json(toContact(page));

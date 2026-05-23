@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { TODAY, MONTHS, Icon, Checkbox, AccountDot } from './shared';
+import { contactsApi } from './api';
 
 // ============================================================
 // Social — Contacts page
@@ -34,33 +35,40 @@ const fmtTimestamp = (iso) => {
 
 const initials = (name) => (name || "?").split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
 
+const QUICK_REL_TYPES = ["Partner", "Spouse", "Parent", "Child", "Sibling", "Friend", "Colleague", "Mentor"];
+
 export function SocialPage({ state, setState, actions }) {
-  const [groupFilter, setGroupFilter] = useState("all");
-  const [tagFilter, setTagFilter] = useState(null);
+  const [tagFilter, setTagFilter] = useState("all");
   const [showAddContact, setShowAddContact] = useState(false);
-  const [showManageGroups, setShowManageGroups] = useState(false);
+  const [showManageTags, setShowManageTags] = useState(false);
   const [search, setSearch] = useState("");
   const [compact, setCompact] = useState(false);
+  const [showLinksView, setShowLinksView] = useState(false);
 
   const groups = state.contactGroups || [];
   const contacts = state.contacts || [];
 
-  const allTags = useMemo(() => {
-    const set = new Set();
-    contacts.forEach((c) => (c.tags || []).forEach((t) => set.add(t)));
-    return [...set].sort();
-  }, [contacts]);
-
   const filtered = contacts.filter((c) => {
-    const matchGroup = groupFilter === "all" || (c.groups || []).includes(groupFilter);
-    const matchTag = !tagFilter || (c.tags || []).includes(tagFilter);
+    const matchTag = tagFilter === "all" || (c.groups || []).includes(tagFilter);
     const matchSearch = !search || c.name.toLowerCase().includes(search.toLowerCase()) ||
       (c.city || "").toLowerCase().includes(search.toLowerCase());
-    return matchGroup && matchTag && matchSearch;
+    return matchTag && matchSearch;
   });
 
   const sorted = [...filtered].sort((a, b) => a.name.localeCompare(b.name));
   const groupById = Object.fromEntries(groups.map((g) => [g.id, g]));
+
+  // Create contact inline (for LinkedContactPicker) — returns real contact with ID
+  const createContactInline = async (name) => {
+    try {
+      const created = await contactsApi.create({ name: name.trim() });
+      setState((s) => ({ ...s, contacts: [...s.contacts, { ...created, notes: [] }] }));
+      return created;
+    } catch (e) {
+      console.error("createContactInline error", e);
+      return null;
+    }
+  };
 
   return (
     <div className="page fade-in">
@@ -68,118 +76,221 @@ export function SocialPage({ state, setState, actions }) {
         <div>
           <h1 className="page-title">Social</h1>
           <p className="page-sub" style={{ margin: 0 }}>
-            {contacts.length} contacts · {groups.length} groups
+            {contacts.length} contacts · {groups.length} tags
           </p>
         </div>
         <div className="row" style={{ gap: 8 }}>
-          {/* Compact toggle */}
-          <button className={"btn" + (compact ? " btn-primary" : "")} onClick={() => setCompact((v) => !v)}
-            title={compact ? "Switch to list view" : "Switch to grid view"}>
+          {/* Links view toggle */}
+          <button className={"btn" + (showLinksView ? " btn-primary" : "")} onClick={() => setShowLinksView((v) => !v)}
+            title={showLinksView ? "Back to contacts" : "View relationship networks"}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              {compact
-                ? <><rect x="1" y="1" width="12" height="3" rx="1" fill="currentColor" opacity=".4"/><rect x="1" y="5.5" width="12" height="3" rx="1" fill="currentColor" opacity=".4"/><rect x="1" y="10" width="12" height="3" rx="1" fill="currentColor"/></>
-                : <><rect x="1" y="1" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="7.5" y="1" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="1" y="7.5" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="7.5" y="7.5" width="5.5" height="5.5" rx="1" fill="currentColor"/></>
-              }
+              <circle cx="2.5" cy="7" r="1.5" fill="currentColor"/>
+              <circle cx="7" cy="2.5" r="1.5" fill="currentColor"/>
+              <circle cx="11.5" cy="7" r="1.5" fill="currentColor"/>
+              <circle cx="7" cy="11.5" r="1.5" fill="currentColor"/>
+              <line x1="2.5" y1="7" x2="7" y2="2.5" stroke="currentColor" strokeWidth="1.2"/>
+              <line x1="7" y1="2.5" x2="11.5" y2="7" stroke="currentColor" strokeWidth="1.2"/>
+              <line x1="2.5" y1="7" x2="7" y2="11.5" stroke="currentColor" strokeWidth="1.2"/>
+              <line x1="7" y1="11.5" x2="11.5" y2="7" stroke="currentColor" strokeWidth="1.2"/>
             </svg>
-            {compact ? "List" : "Grid"}
+            Networks
           </button>
-          <button className="btn" onClick={() => setShowManageGroups(true)}>Manage groups</button>
+          {/* Compact toggle */}
+          {!showLinksView && (
+            <button className={"btn" + (compact ? " btn-primary" : "")} onClick={() => setCompact((v) => !v)}
+              title={compact ? "Switch to list view" : "Switch to grid view"}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                {compact
+                  ? <><rect x="1" y="1" width="12" height="3" rx="1" fill="currentColor" opacity=".4"/><rect x="1" y="5.5" width="12" height="3" rx="1" fill="currentColor" opacity=".4"/><rect x="1" y="10" width="12" height="3" rx="1" fill="currentColor"/></>
+                  : <><rect x="1" y="1" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="7.5" y="1" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="1" y="7.5" width="5.5" height="5.5" rx="1" fill="currentColor"/><rect x="7.5" y="7.5" width="5.5" height="5.5" rx="1" fill="currentColor"/></>
+                }
+              </svg>
+              {compact ? "List" : "Grid"}
+            </button>
+          )}
+          <button className="btn" onClick={() => setShowManageTags(true)}>Manage tags</button>
           <button className="btn btn-primary" onClick={() => setShowAddContact(true)}>
             <Icon.Plus /> Add contact
           </button>
         </div>
       </div>
 
-      {/* Filters */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12, flexWrap: "wrap" }}>
-        <div className="filter-row">
-          <button className={"filter-btn" + (groupFilter === "all" ? " is-active" : "")} onClick={() => setGroupFilter("all")}>All</button>
-          {groups.map((g) => (
-            <button key={g.id} className={"filter-btn" + (groupFilter === g.id ? " is-active" : "")} onClick={() => setGroupFilter(g.id)}>
-              {g.icon ? <span style={{ marginRight: 4 }}>{g.icon}</span> : null}{g.name}
-            </button>
-          ))}
-        </div>
-        <div className="spacer" />
-        <input className="input" style={{ maxWidth: 220, padding: "7px 12px", fontSize: 13 }}
-          placeholder="Search contacts…" value={search} onChange={(e) => setSearch(e.target.value)} />
-      </div>
+      {!showLinksView && (
+        <>
+          {/* Filters */}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18, flexWrap: "wrap" }}>
+            <div className="filter-row">
+              <button className={"filter-btn" + (tagFilter === "all" ? " is-active" : "")} onClick={() => setTagFilter("all")}>All</button>
+              {groups.map((g) => (
+                <button key={g.id} className={"filter-btn" + (tagFilter === g.id ? " is-active" : "")} onClick={() => setTagFilter(g.id)}>
+                  {g.icon ? <span style={{ marginRight: 4 }}>{g.icon}</span> : null}{g.name}
+                </button>
+              ))}
+            </div>
+            <div className="spacer" />
+            <input className="input" style={{ maxWidth: 220, padding: "7px 12px", fontSize: 13 }}
+              placeholder="Search contacts…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
 
-      {/* Tag filters */}
-      {allTags.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 18, flexWrap: "wrap" }}>
-          <span className="tiny" style={{ marginRight: 4 }}>Tags</span>
-          {allTags.map((tag) => (
-            <button key={tag} className={"tag-filter" + (tagFilter === tag ? " is-active" : "")}
-              onClick={() => setTagFilter(tagFilter === tag ? null : tag)}>{tag}</button>
-          ))}
-          {tagFilter && <button className="btn-text" style={{ fontSize: 12 }} onClick={() => setTagFilter(null)}>Clear</button>}
-        </div>
+          {/* Birthday banner */}
+          {(() => {
+            const upcoming = contacts
+              .filter((c) => c.birthday && daysUntilBirthday(c.birthday) <= 14 && daysUntilBirthday(c.birthday) >= 0)
+              .sort((a, b) => daysUntilBirthday(a.birthday) - daysUntilBirthday(b.birthday));
+            if (!upcoming.length) return null;
+            return (
+              <div className="birthday-banner">
+                <span style={{ fontSize: 16 }}>🎂</span>
+                <span>
+                  {upcoming.map((c, i) => {
+                    const d = daysUntilBirthday(c.birthday);
+                    return (
+                      <span key={c.id}>
+                        {i > 0 && " · "}
+                        <strong>{c.name}</strong>
+                        {d === 0 ? " today!" : d === 1 ? " tomorrow" : ` in ${d} days`}
+                      </span>
+                    );
+                  })}
+                </span>
+              </div>
+            );
+          })()}
+
+          {/* Contact list */}
+          <div className={compact ? "contact-list contact-list--grid" : "contact-list"}>
+            {sorted.map((c) => (
+              <ContactCard
+                key={c.id}
+                c={c}
+                compact={compact}
+                groupById={groupById}
+                allGroups={groups}
+                allContacts={contacts}
+                onUpdate={(patch) => actions.updateContact(c.id, patch)}
+                onDelete={() => actions.deleteContact(c.id)}
+                onAddNote={(text) => actions.addNote(c.id, text)}
+                onDeleteNote={(nid) => actions.deleteNote(c.id, nid)}
+                onCreateContact={createContactInline}
+              />
+            ))}
+            {sorted.length === 0 && (
+              <div className="card" style={{ textAlign: "center", color: "var(--text-3)", padding: "40px 16px", gridColumn: "1/-1" }}>
+                {search ? "No contacts match your search." : "No contacts yet. Add your first one above."}
+              </div>
+            )}
+          </div>
+        </>
       )}
 
-      {/* Birthday banner */}
-      {(() => {
-        const upcoming = contacts
-          .filter((c) => c.birthday && daysUntilBirthday(c.birthday) <= 14 && daysUntilBirthday(c.birthday) >= 0)
-          .sort((a, b) => daysUntilBirthday(a.birthday) - daysUntilBirthday(b.birthday));
-        if (!upcoming.length) return null;
-        return (
-          <div className="birthday-banner">
-            <span style={{ fontSize: 16 }}>🎂</span>
-            <span>
-              {upcoming.map((c, i) => {
-                const d = daysUntilBirthday(c.birthday);
-                return (
-                  <span key={c.id}>
-                    {i > 0 && " · "}
-                    <strong>{c.name}</strong>
-                    {d === 0 ? " today!" : d === 1 ? " tomorrow" : ` in ${d} days`}
-                  </span>
-                );
-              })}
-            </span>
-          </div>
-        );
-      })()}
-
-      {/* Contact list */}
-      <div className={compact ? "contact-list contact-list--grid" : "contact-list"}>
-        {sorted.map((c) => (
-          <ContactCard
-            key={c.id}
-            c={c}
-            compact={compact}
-            groupById={groupById}
-            allGroups={groups}
-            allContacts={contacts}
-            onUpdate={(patch) => actions.updateContact(c.id, patch)}
-            onDelete={() => actions.deleteContact(c.id)}
-            onAddNote={(text) => actions.addNote(c.id, text)}
-            onDeleteNote={(nid) => actions.deleteNote(c.id, nid)}
-          />
-        ))}
-        {sorted.length === 0 && (
-          <div className="card" style={{ textAlign: "center", color: "var(--text-3)", padding: "40px 16px", gridColumn: "1/-1" }}>
-            {search ? "No contacts match your search." : "No contacts yet. Add your first one above."}
-          </div>
-        )}
-      </div>
+      {showLinksView && (
+        <RelationshipLinksView contacts={contacts} />
+      )}
 
       {showAddContact && (
         <AddContactModal groups={groups} onClose={() => setShowAddContact(false)}
           onSave={(contact) => { actions.addContact(contact); setShowAddContact(false); }} />
       )}
-      {showManageGroups && (
-        <ManageGroupsModal groups={groups} onClose={() => setShowManageGroups(false)}
-          onSave={(newGroups) => { actions.saveContactGroups(newGroups); setShowManageGroups(false); }} />
+      {showManageTags && (
+        <ManageTagsModal groups={groups} onClose={() => setShowManageTags(false)}
+          onSave={(newGroups) => { actions.saveContactGroups(newGroups); setShowManageTags(false); }} />
       )}
+    </div>
+  );
+}
+
+// ----------- Relationship links view -----------
+
+function RelationshipLinksView({ contacts }) {
+  const contactById = Object.fromEntries(contacts.map((c) => [c.id, c]));
+
+  // Build undirected adjacency from linkedContacts on each contact
+  const adj = {};
+  contacts.forEach((c) => {
+    if (!adj[c.id]) adj[c.id] = [];
+    (c.linkedContacts || []).forEach((link) => {
+      adj[c.id].push({ id: link.id, rel: link.relationship });
+      if (!adj[link.id]) adj[link.id] = [];
+      if (!adj[link.id].some((x) => x.id === c.id)) {
+        adj[link.id].push({ id: c.id, rel: link.relationship });
+      }
+    });
+  });
+
+  // Find connected components (BFS)
+  const visited = new Set();
+  const networks = [];
+  contacts.forEach((c) => {
+    if (visited.has(c.id)) return;
+    if (!adj[c.id] || adj[c.id].length === 0) return;
+    const component = [];
+    const queue = [c.id];
+    visited.add(c.id);
+    while (queue.length > 0) {
+      const id = queue.shift();
+      component.push(id);
+      (adj[id] || []).forEach((link) => {
+        if (!visited.has(link.id)) {
+          visited.add(link.id);
+          queue.push(link.id);
+        }
+      });
+    }
+    networks.push(component);
+  });
+
+  if (networks.length === 0) {
+    return (
+      <div className="card" style={{ textAlign: "center", padding: "48px 20px", color: "var(--text-3)" }}>
+        No linked contacts yet. Open any contact card and use "+ Link" to connect people together.
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {networks.map((ids, i) => (
+        <div key={i} className="card" style={{ padding: 18 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            <span className="contact-section-label" style={{ marginBottom: 0 }}>
+              Network · {ids.length} people
+            </span>
+          </div>
+          <div className="network-grid">
+            {ids.map((id) => {
+              const c = contactById[id];
+              if (!c) return null;
+              const links = (adj[id] || []).filter((l) => contactById[l.id]);
+              return (
+                <div key={id} className="network-member">
+                  <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
+                    <div className="contact-avatar" style={{ width: 28, height: 28, fontSize: 9 }}>
+                      {initials(c.name)}
+                    </div>
+                    <span style={{ fontWeight: 500, fontSize: 13 }}>{c.name}</span>
+                  </div>
+                  {links.map((link, j) => {
+                    const lc = contactById[link.id];
+                    return (
+                      <div key={j} className="network-link-line">
+                        <span className="network-rel">{link.rel || "linked to"}</span>
+                        <span className="network-target">{lc?.name}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
 
 // ----------- Contact card -----------
 
-function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, onDelete, onAddNote, onDeleteNote }) {
+function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, onDelete, onAddNote, onDeleteNote, onCreateContact }) {
   const [showGroupPicker, setShowGroupPicker] = useState(false);
   const [editLastSeen, setEditLastSeen] = useState(false);
   const [lastSeenVal, setLastSeenVal] = useState(c.lastSeen || "");
@@ -265,43 +376,83 @@ function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, 
   const PREVIEW = 90;
   const inits = initials(c.name);
 
-  // Compact card
+  // Compact card (grid view)
   if (compact) {
     return (
       <div className="contact-card contact-card--compact">
-        <div className="contact-row" style={{ padding: "12px 14px", gap: 10 }}>
-          <div className="contact-avatar" style={{ width: 30, height: 30, fontSize: 10, flexShrink: 0 }}>{inits}</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="contact-name" style={{ fontSize: 13.5 }}>{c.name}</div>
-            {contactGroups.length > 0 && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 3 }}>
-                {contactGroups.map((gid) => {
-                  const grp = groupById[gid];
-                  return grp ? (
-                    <span key={gid} className="contact-group-tag" style={{ fontSize: 10.5, padding: "1px 5px" }}>
-                      {grp.icon && <span style={{ marginRight: 2 }}>{grp.icon}</span>}{grp.name}
-                    </span>
-                  ) : null;
-                })}
-              </div>
-            )}
-            {c.lastSeen && (
-              <div style={{ fontSize: 11, color: "var(--text-2)", marginTop: 3 }}>Last seen {c.lastSeen}</div>
-            )}
-            {c.city && <div className="tiny" style={{ color: "var(--text-3)", marginTop: 2 }}>{c.city}</div>}
+        <div style={{ padding: "12px 14px" }}>
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
+            <div className="contact-avatar" style={{ width: 28, height: 28, fontSize: 9, flexShrink: 0 }}>{inits}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 500, fontSize: 13.5, lineHeight: 1.2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</div>
+              {contactGroups.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 3 }}>
+                  {contactGroups.slice(0, 3).map((gid) => {
+                    const grp = groupById[gid];
+                    return grp ? (
+                      <span key={gid} className="contact-group-tag" style={{ fontSize: 10, padding: "1px 5px" }}>
+                        {grp.icon && <span style={{ marginRight: 2 }}>{grp.icon}</span>}{grp.name}
+                      </span>
+                    ) : null;
+                  })}
+                </div>
+              )}
+            </div>
+            <div style={{ position: "relative", flexShrink: 0 }} ref={kebabRef}>
+              <button className="contact-kebab" onClick={(e) => { e.stopPropagation(); setShowKebab((v) => !v); }}>
+                <Icon.Kebab />
+              </button>
+              {showKebab && (
+                <div className="kebab-dropdown">
+                  <button onClick={(e) => { e.stopPropagation(); setShowEditModal(true); setShowKebab(false); }}>Edit contact</button>
+                  <button style={{ color: "var(--error)" }} onClick={(e) => { e.stopPropagation(); onDelete(); }}>Delete</button>
+                </div>
+              )}
+            </div>
           </div>
-          <div style={{ position: "relative", flexShrink: 0 }} ref={kebabRef}>
-            <button className="contact-kebab" onClick={(e) => { e.stopPropagation(); setShowKebab((v) => !v); }}>
-              <Icon.Kebab />
-            </button>
-            {showKebab && (
-              <div className="kebab-dropdown">
-                <button onClick={(e) => { e.stopPropagation(); setShowEditModal(true); setShowKebab(false); }}>Edit contact</button>
-                <button style={{ color: "var(--error)" }} onClick={(e) => { e.stopPropagation(); onDelete(); }}>Delete</button>
-              </div>
-            )}
-          </div>
+
+          {/* Location */}
+          {(c.from || c.city) && (
+            <div style={{ fontSize: 11.5, color: "var(--text-2)", marginBottom: 4 }}>
+              {c.from && <span><span style={{ color: "var(--text-3)" }}>From</span> {c.from}</span>}
+              {c.from && c.city && <span style={{ color: "var(--text-3)" }}> · </span>}
+              {c.city && <span><span style={{ color: "var(--text-3)" }}>Now</span> {c.city}</span>}
+            </div>
+          )}
+
+          {/* Last seen */}
+          {c.lastSeen && (
+            <div style={{ fontSize: 11.5, color: "var(--text-2)", marginBottom: 4 }}>
+              <span style={{ color: "var(--text-3)" }}>Last seen</span> {c.lastSeen}
+            </div>
+          )}
+
+          {/* Context snippet */}
+          {c.context && (
+            <div style={{ fontSize: 11.5, color: "var(--text-2)", marginBottom: 5,
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {c.context}
+            </div>
+          )}
+
+          {/* Linked contacts mini */}
+          {linkedContacts.length > 0 && (
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+              {linkedContacts.slice(0, 3).map((link) => {
+                const ct = allContactsById[link.id];
+                return ct ? (
+                  <span key={link.id} className="linked-contact-pill" style={{ fontSize: 10.5 }}>
+                    <span className="linked-avatar" style={{ width: 14, height: 14, fontSize: 6 }}>{initials(ct.name)}</span>
+                    <span className="linked-name">{ct.name}</span>
+                    {link.relationship && <span className="linked-rel">— {link.relationship}</span>}
+                  </span>
+                ) : null;
+              })}
+            </div>
+          )}
         </div>
+
         {showEditModal && (
           <EditContactModal contact={c} groups={allGroups}
             onClose={() => setShowEditModal(false)}
@@ -321,7 +472,7 @@ function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, 
         <div className="contact-info">
           <div className="contact-name">{c.name}</div>
 
-          {/* Groups inline */}
+          {/* Tags inline */}
           <div className="contact-meta">
             <div className="contact-groups-inline" onClick={(e) => e.stopPropagation()}>
               {contactGroups.map((gid) => {
@@ -363,13 +514,12 @@ function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, 
                 <span style={{ color: "var(--text-3)" }}>Now</span> {c.city}
               </span>
             )}
+            {c.introducedBy && (
+              <span className="tiny" style={{ color: "var(--text-2)" }}>
+                <span style={{ color: "var(--text-3)" }}>Via</span> {c.introducedBy}
+              </span>
+            )}
           </div>
-
-          {(c.tags || []).length > 0 && (
-            <div className="contact-tags">
-              {c.tags.map((t) => <span key={t} className="contact-tag">{t}</span>)}
-            </div>
-          )}
 
           {/* Gift ideas */}
           <div className="contact-gift-inline" onClick={(e) => e.stopPropagation()}>
@@ -430,7 +580,7 @@ function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, 
       </div>
 
       {/* Context section */}
-      <div className="contact-section" style={{ padding: "0 18px 0 68px" }}>
+      <div className="contact-section">
         <div className="contact-section-label">Context</div>
         {editContext ? (
           <textarea className="input" rows={3} style={{ fontSize: 13, marginTop: 4 }}
@@ -450,7 +600,7 @@ function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, 
       </div>
 
       {/* Linked contacts */}
-      <div className="contact-section" style={{ padding: "8px 18px 0 68px" }}>
+      <div className="contact-section" style={{ paddingTop: 8 }}>
         <div className="contact-section-label">Linked contacts</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 5 }}>
           {linkedContacts.map((link) => {
@@ -475,6 +625,7 @@ function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, 
                 excludeIds={[c.id, ...linkedContacts.map((l) => l.id)]}
                 onSelect={addLinkedContact}
                 onClose={() => setShowLinkPicker(false)}
+                onCreateContact={onCreateContact}
               />
             )}
           </div>
@@ -526,15 +677,55 @@ function ContactCard({ c, compact, groupById, allGroups, allContacts, onUpdate, 
 
 // ----------- Linked contact picker -----------
 
-function LinkedContactPicker({ allContacts, excludeIds, onSelect, onClose }) {
+function LinkedContactPicker({ allContacts, excludeIds, onSelect, onClose, onCreateContact }) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState(null);
   const [relationship, setRelationship] = useState("");
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [creating, setCreating] = useState(false);
 
   const filtered = allContacts.filter((c) =>
     !excludeIds.includes(c.id) &&
     (!search || c.name.toLowerCase().includes(search.toLowerCase()))
   );
+
+  if (showCreateForm) {
+    return (
+      <div className="link-picker-dropdown">
+        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)", marginBottom: 8 }}>Create new contact</div>
+        <input className="input input--xs" style={{ width: "100%", marginBottom: 8 }}
+          placeholder="Full name"
+          value={newName} onChange={(e) => setNewName(e.target.value)}
+          autoFocus
+          onKeyDown={async (e) => {
+            if (e.key === "Enter" && newName.trim() && onCreateContact) {
+              setCreating(true);
+              const created = await onCreateContact(newName.trim());
+              if (created) setSelected(created);
+              setCreating(false);
+              setShowCreateForm(false);
+            }
+            if (e.key === "Escape") setShowCreateForm(false);
+          }} />
+        <div style={{ display: "flex", gap: 6 }}>
+          <button className="btn btn-primary" style={{ fontSize: 12, padding: "3px 10px" }}
+            disabled={!newName.trim() || creating}
+            onClick={async () => {
+              if (!onCreateContact) return;
+              setCreating(true);
+              const created = await onCreateContact(newName.trim());
+              if (created) setSelected(created);
+              setCreating(false);
+              setShowCreateForm(false);
+            }}>
+            {creating ? "Creating…" : "Create"}
+          </button>
+          <button className="btn-text" style={{ fontSize: 12 }} onClick={() => { setShowCreateForm(false); setNewName(""); }}>Back</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="link-picker-dropdown">
@@ -543,8 +734,10 @@ function LinkedContactPicker({ allContacts, excludeIds, onSelect, onClose }) {
           <input className="input input--xs" style={{ width: "100%", marginBottom: 6 }}
             placeholder="Search contacts…" value={search}
             onChange={(e) => setSearch(e.target.value)} autoFocus />
-          <div style={{ maxHeight: 180, overflowY: "auto" }}>
-            {filtered.length === 0 && <div className="tiny" style={{ padding: "6px 4px", color: "var(--text-3)" }}>No contacts found</div>}
+          <div style={{ maxHeight: 160, overflowY: "auto" }}>
+            {filtered.length === 0 && (
+              <div className="tiny" style={{ padding: "6px 4px", color: "var(--text-3)" }}>No contacts found</div>
+            )}
             {filtered.map((c) => (
               <button key={c.id} onClick={() => setSelected(c)}
                 style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "6px 8px", borderRadius: 6, background: "none", border: "none", cursor: "pointer", textAlign: "left", fontSize: 13 }}
@@ -557,14 +750,38 @@ function LinkedContactPicker({ allContacts, excludeIds, onSelect, onClose }) {
               </button>
             ))}
           </div>
+          {onCreateContact && (
+            <div style={{ borderTop: "1px solid var(--border-soft)", marginTop: 4, paddingTop: 6 }}>
+              <button onClick={() => { setShowCreateForm(true); setNewName(search); }}
+                style={{ display: "flex", alignItems: "center", gap: 6, width: "100%", padding: "5px 8px", borderRadius: 6, background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "var(--accent)" }}>
+                <Icon.Plus /> New contact{search ? ` "${search}"` : ""}
+              </button>
+            </div>
+          )}
         </>
       ) : (
         <div>
-          <div style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 8 }}>
-            Linking <strong>{selected.name}</strong>
+          <div style={{ fontSize: 12, color: "var(--text-2)", marginBottom: 10 }}>
+            Linking <strong>{selected.name}</strong> — choose relationship:
+          </div>
+          {/* Quick type pills */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 10 }}>
+            {QUICK_REL_TYPES.map((t) => (
+              <button key={t}
+                onClick={() => { setRelationship(t); onSelect(selected.id, t); }}
+                style={{
+                  padding: "3px 9px", border: "1px solid var(--border)", borderRadius: 999,
+                  fontSize: 11.5, cursor: "pointer", background: "none", color: "var(--text-2)",
+                  transition: "all 120ms",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "var(--text)"; e.currentTarget.style.color = "#fff"; e.currentTarget.style.borderColor = "var(--text)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = "var(--text-2)"; e.currentTarget.style.borderColor = "var(--border)"; }}>
+                {t}
+              </button>
+            ))}
           </div>
           <input className="input input--xs" style={{ width: "100%", marginBottom: 8 }}
-            placeholder="Relationship (e.g. Father, Partner)"
+            placeholder="Or type custom (e.g. Mom, Business partner)"
             value={relationship} onChange={(e) => setRelationship(e.target.value)}
             autoFocus
             onKeyDown={(e) => {
@@ -585,13 +802,14 @@ function LinkedContactPicker({ allContacts, excludeIds, onSelect, onClose }) {
 // ----------- Edit Contact modal -----------
 
 function EditContactModal({ contact, groups, onClose, onSave }) {
-  const [name, setName]           = useState(contact.name);
-  const [from, setFrom]           = useState(contact.from || "");
-  const [city, setCity]           = useState(contact.city || "");
-  const [birthday, setBirthday]   = useState(contact.birthday || "");
-  const [editGroups, setEditGroups] = useState(contact.groups || []);
-  const [lastSeen, setLastSeen]   = useState(contact.lastSeen || "");
-  const [giftIdeas, setGiftIdeas] = useState(contact.giftIdeas || "");
+  const [name, setName]               = useState(contact.name);
+  const [from, setFrom]               = useState(contact.from || "");
+  const [city, setCity]               = useState(contact.city || "");
+  const [birthday, setBirthday]       = useState(contact.birthday || "");
+  const [editGroups, setEditGroups]   = useState(contact.groups || []);
+  const [lastSeen, setLastSeen]       = useState(contact.lastSeen || "");
+  const [giftIdeas, setGiftIdeas]     = useState(contact.giftIdeas || "");
+  const [introducedBy, setIntroducedBy] = useState(contact.introducedBy || "");
 
   const toggleGroup = (gid) => setEditGroups((prev) =>
     prev.includes(gid) ? prev.filter((id) => id !== gid) : [...prev, gid]
@@ -623,9 +841,13 @@ function EditContactModal({ contact, groups, onClose, onSave }) {
             <input className="input" value={lastSeen} onChange={(e) => setLastSeen(e.target.value)} placeholder="e.g. 2 weeks ago" />
           </div>
         </div>
+        <div className="field">
+          <label>Introduced by</label>
+          <input className="input" value={introducedBy} onChange={(e) => setIntroducedBy(e.target.value)} placeholder="e.g. Sarah M." />
+        </div>
         {groups.length > 0 && (
           <div className="field">
-            <label>Groups</label>
+            <label>Tags</label>
             <div className="group-checkboxes">
               {groups.map((g) => (
                 <label key={g.id} className={"group-checkbox-label" + (editGroups.includes(g.id) ? " is-checked" : "")}>
@@ -647,6 +869,7 @@ function EditContactModal({ contact, groups, onClose, onSave }) {
             from: from.trim(), city: city.trim(),
             birthday, groups: editGroups,
             lastSeen: lastSeen.trim(), giftIdeas: giftIdeas.trim(),
+            introducedBy: introducedBy.trim(),
           })}>Save</button>
         </div>
       </div>
@@ -696,6 +919,7 @@ function AddContactModal({ groups, onClose, onSave }) {
   const [birthday, setBirthday]       = useState("");
   const [selectedGroups, setSelectedGroups] = useState([]);
   const [lastSeen, setLastSeen]       = useState("");
+  const [introducedBy, setIntroducedBy] = useState("");
 
   const toggleGroup = (gid) => setSelectedGroups((prev) =>
     prev.includes(gid) ? prev.filter((id) => id !== gid) : [...prev, gid]
@@ -703,7 +927,7 @@ function AddContactModal({ groups, onClose, onSave }) {
 
   const save = () => {
     if (!name.trim()) return;
-    onSave({ id: "c-" + Date.now(), name: name.trim(), from: from.trim(), city: city.trim(), birthday: birthday || null, groups: selectedGroups, lastSeen: lastSeen.trim() || null, notes: [] });
+    onSave({ id: "c-" + Date.now(), name: name.trim(), from: from.trim(), city: city.trim(), birthday: birthday || null, groups: selectedGroups, lastSeen: lastSeen.trim() || null, introducedBy: introducedBy.trim(), notes: [] });
   };
 
   return (
@@ -733,9 +957,13 @@ function AddContactModal({ groups, onClose, onSave }) {
             <input className="input" placeholder="e.g. Last week" value={lastSeen} onChange={(e) => setLastSeen(e.target.value)} />
           </div>
         </div>
+        <div className="field">
+          <label>Introduced by</label>
+          <input className="input" placeholder="e.g. Sarah M." value={introducedBy} onChange={(e) => setIntroducedBy(e.target.value)} />
+        </div>
         {groups.length > 0 && (
           <div className="field">
-            <label>Groups</label>
+            <label>Tags</label>
             <div className="group-checkboxes">
               {groups.map((g) => (
                 <label key={g.id} className={"group-checkbox-label" + (selectedGroups.includes(g.id) ? " is-checked" : "")}>
@@ -755,24 +983,24 @@ function AddContactModal({ groups, onClose, onSave }) {
   );
 }
 
-// ----------- Manage Groups modal -----------
+// ----------- Manage Tags modal -----------
 
-function ManageGroupsModal({ groups, onClose, onSave }) {
+function ManageTagsModal({ groups, onClose, onSave }) {
   const [items, setItems] = useState([...groups]);
   const [newName, setNewName] = useState("");
   const [newIcon, setNewIcon] = useState("");
 
   const add = () => {
     if (!newName.trim()) return;
-    setItems((s) => [...s, { id: "grp-" + Date.now(), name: newName.trim(), icon: newIcon || "👥" }]);
+    setItems((s) => [...s, { id: "grp-" + Date.now(), name: newName.trim(), icon: newIcon || "🏷️" }]);
     setNewName(""); setNewIcon("");
   };
 
   return (
     <div className="modal-back" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3>Manage groups</h3>
-        <div className="tiny" style={{ marginBottom: 14 }}>Add, rename, or remove contact groups.</div>
+        <h3>Manage tags</h3>
+        <div className="tiny" style={{ marginBottom: 14 }}>Add, rename, or remove contact tags.</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {items.map((g) => (
             <div key={g.id} className="group-row">
@@ -788,14 +1016,14 @@ function ManageGroupsModal({ groups, onClose, onSave }) {
         </div>
         <div className="group-row" style={{ marginTop: 12 }}>
           <input className="group-icon-input" value={newIcon} maxLength={4}
-            onChange={(e) => setNewIcon(e.target.value)} placeholder="👥" style={{ width: 36, textAlign: "center" }} />
-          <input className="input" style={{ flex: 1 }} placeholder="New group name" value={newName}
+            onChange={(e) => setNewIcon(e.target.value)} placeholder="🏷️" style={{ width: 36, textAlign: "center" }} />
+          <input className="input" style={{ flex: 1 }} placeholder="New tag name" value={newName}
             onChange={(e) => setNewName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") add(); }} />
           <button className="btn btn-primary" onClick={add} disabled={!newName.trim()}>Add</button>
         </div>
         <div className="actions">
           <button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={() => onSave(items)}>Save groups</button>
+          <button className="btn btn-primary" onClick={() => onSave(items)}>Save tags</button>
         </div>
       </div>
     </div>
