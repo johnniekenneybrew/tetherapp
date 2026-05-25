@@ -28,7 +28,7 @@ const ACCOUNT_LABELS = ["getro", "jones", "personal"];
 
 function isoToDue(iso) {
   if (!iso) return null;
-  const ms = new Date(iso + "T12:00:00").getTime();
+  const ms = new Date(iso + "T00:00:00").getTime();
   return Math.round((ms - TODAY_MS) / 86400000);
 }
 
