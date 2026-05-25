@@ -2,7 +2,22 @@ import { setCors } from "./_notion.js";
 import {
   listTasks, listCompletedTasks, getTask,
   createTask, updateTask, closeTask, reopenTask, deleteTask,
+  listLabels, createLabel,
 } from "./_todoist.js";
+
+// Ensure account labels exist in Todoist (runs once per cold start)
+let labelsEnsured = false;
+async function ensureAccountLabels() {
+  if (labelsEnsured) return;
+  const existing = await listLabels();
+  const existingNames = new Set(existing.map(l => l.name));
+  await Promise.all(
+    ACCOUNT_LABELS
+      .filter(name => !existingNames.has(name))
+      .map(name => createLabel(name))
+  );
+  labelsEnsured = true;
+}
 
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
 const TODAY_MS  = new Date(TODAY_ISO + "T00:00:00").getTime();
@@ -65,6 +80,8 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
 
   try {
+    await ensureAccountLabels();
+
     // ── GET ──────────────────────────────────────────────────
     if (req.method === "GET") {
       // Active tasks
