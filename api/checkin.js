@@ -6,7 +6,6 @@ async function ensureCheckinSchema() {
   try {
     const db = await notion.databases.retrieve({ database_id: DB.CHECKINS });
     const updates = {};
-    if (!db.properties.Priorities)    updates.Priorities    = { rich_text: {} };
     if (!db.properties["Sections Done"]) updates["Sections Done"] = { rich_text: {} };
     if (Object.keys(updates).length > 0) {
       await notion.databases.update({ database_id: DB.CHECKINS, properties: updates });
@@ -18,9 +17,6 @@ async function ensureCheckinSchema() {
   }
 }
 
-function parsePriorities(raw) {
-  try { return JSON.parse(raw || "[]"); } catch { return []; }
-}
 function parseJSON(raw, fallback) {
   try { return JSON.parse(raw || JSON.stringify(fallback)) ?? fallback; } catch { return fallback; }
 }
@@ -40,7 +36,6 @@ function toCheckin(page) {
       p.rich(props["Learning 2"]) || "",
       p.rich(props["Learning 3"]) || "",
     ],
-    priorities:   parsePriorities(p.rich(props.Priorities)),
     completed:    p.checkbox(props.Completed),
     sectionsDone: parseJSON(p.rich(props["Sections Done"]), {}),
     habitsUpdatedConfirmed: false,
@@ -100,7 +95,6 @@ export default async function handler(req, res) {
         updates["Learning 3"] = P.rich(patch.learnings[2] || "");
       }
       if (patch.completed     !== undefined) updates.Completed       = P.checkbox(patch.completed);
-      if (patch.priorities    !== undefined) updates.Priorities      = P.rich(JSON.stringify(patch.priorities || []));
       if (patch.sectionsDone  !== undefined) updates["Sections Done"] = P.rich(JSON.stringify(patch.sectionsDone || {}));
 
       const page = await notion.pages.update({ page_id: id, properties: updates });
