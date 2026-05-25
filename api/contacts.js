@@ -28,11 +28,11 @@ function toContact(googlePerson) {
     groups: memberships
       .map(m => m.contactGroupMembership?.contactGroupResourceName || "")
       .filter(r => /^contactGroups\/\d+$/.test(r)), // only user groups (numeric IDs)
-    linkedContacts: relations.map(r => ({
-      id: r.person?.resourceName || "",
-      name: r.person?.names?.[0]?.displayName || "",
-      relationship: r.relationshipType || "other"
-    })),
+    linkedContacts: (() => {
+      const json = getCustomField(userDefined, "linkedContacts");
+      if (!json) return [];
+      try { return JSON.parse(json); } catch { return []; }
+    })(),
     from: getCustomField(userDefined, "from") || "",
     lastSeen: getCustomField(userDefined, "lastSeen") || "",
     giftIdeas: getCustomField(userDefined, "giftIdeas") || "",
@@ -44,49 +44,52 @@ function toContact(googlePerson) {
 }
 
 function toGooglePerson(contact, existingPerson = null) {
-  const person = existingPerson || {};
+  // Shallow clone so we don't mutate the original
+  const person = existingPerson ? { ...existingPerson } : {};
 
-  // Names
-  person.names = [{
-    displayName: contact.name || "",
-    givenName: contact.name?.split(" ")[0] || "",
-    familyName: contact.name?.split(" ").slice(1).join(" ") || "",
-  }];
-
-  // Email
-  if (contact.email) {
-    person.emailAddresses = [{ value: contact.email, type: "work" }];
+  // Only update each field if it is explicitly present in the patch —
+  // this prevents partial patches (e.g. {groups:[…]}) from clearing other fields.
+  if (contact.name !== undefined) {
+    person.names = [{
+      displayName: contact.name || "",
+      givenName: contact.name?.split(" ")[0] || "",
+      familyName: contact.name?.split(" ").slice(1).join(" ") || "",
+    }];
   }
-
-  // Phone
-  if (contact.phone) {
-    person.phoneNumbers = [{ value: contact.phone, type: "mobile" }];
+  if (contact.email !== undefined) {
+    person.emailAddresses = contact.email ? [{ value: contact.email, type: "work" }] : [];
   }
-
-  // Address (city)
-  if (contact.city) {
-    person.addresses = [{ city: contact.city, type: "work" }];
+  if (contact.phone !== undefined) {
+    person.phoneNumbers = contact.phone ? [{ value: contact.phone, type: "mobile" }] : [];
   }
-
-  // Birthday (YYYY-MM-DD format)
-  if (contact.birthday) {
-    const parts = contact.birthday.split("-").map(Number);
-    if (parts.length === 3) {
-      person.birthdays = [{ date: {
-        year: parts[0] || undefined,
-        month: parts[1],
-        day: parts[2]
-      } }];
+  if (contact.city !== undefined) {
+    person.addresses = contact.city ? [{ city: contact.city, type: "work" }] : [];
+  }
+  if (contact.birthday !== undefined) {
+    if (contact.birthday) {
+      const parts = contact.birthday.split("-").map(Number);
+      if (parts.length === 3) {
+        person.birthdays = [{ date: { year: parts[0] || undefined, month: parts[1], day: parts[2] } }];
+      }
+    } else {
+      person.birthdays = [];
     }
   }
 
-  // Custom fields
-  person.userDefined = existingPerson?.userDefined || [];
-  person.userDefined = setCustomField(person.userDefined, "from", contact.from || null);
-  person.userDefined = setCustomField(person.userDefined, "lastSeen", contact.lastSeen || null);
-  person.userDefined = setCustomField(person.userDefined, "giftIdeas", contact.giftIdeas || null);
-  person.userDefined = setCustomField(person.userDefined, "context", contact.context || null);
-  person.userDefined = setCustomField(person.userDefined, "introducedBy", contact.introducedBy || null);
+  // Preserve existing userDefined, then apply only the fields present in the patch
+  person.userDefined = existingPerson?.userDefined ? [...existingPerson.userDefined] : [];
+  if (contact.from !== undefined)         person.userDefined = setCustomField(person.userDefined, "from",           contact.from || null);
+  if (contact.lastSeen !== undefined)     person.userDefined = setCustomField(person.userDefined, "lastSeen",       contact.lastSeen || null);
+  if (contact.giftIdeas !== undefined)    person.userDefined = setCustomField(person.userDefined, "giftIdeas",      contact.giftIdeas || null);
+  if (contact.context !== undefined)      person.userDefined = setCustomField(person.userDefined, "context",        contact.context || null);
+  if (contact.introducedBy !== undefined) person.userDefined = setCustomField(person.userDefined, "introducedBy",   contact.introducedBy || null);
+  // Linked contacts stored as JSON in userDefined so they survive Google sync
+  if (contact.linkedContacts !== undefined) {
+    person.userDefined = setCustomField(
+      person.userDefined, "linkedContacts",
+      contact.linkedContacts?.length ? JSON.stringify(contact.linkedContacts) : null
+    );
+  }
 
   return person;
 }
@@ -126,13 +129,13 @@ export default async function handler(req, res) {
       const { id, ...patch } = req.body;
       if (!id) return res.status(400).json({ error: "id required" });
 
-      const existing = await getContact(id);
+      let existing = await getContact(id);
 
-      // Handle group membership changes
+      // Handle group membership changes first (modifies person on Google's side)
       if (patch.groups !== undefined) {
         const oldGroups = (existing.memberships || [])
-          .filter(m => !m.contactGroupMembership?.contactGroupResourceName?.includes("myContacts"))
-          .map(m => m.contactGroupMembership?.contactGroupResourceName || "");
+          .map(m => m.contactGroupMembership?.contactGroupResourceName || "")
+          .filter(r => /^contactGroups\/\d+$/.test(r));
 
         const toAdd = (patch.groups || []).filter(g => !oldGroups.includes(g));
         const toRemove = oldGroups.filter(g => !(patch.groups || []).includes(g));
@@ -144,20 +147,22 @@ export default async function handler(req, res) {
         for (const groupId of toRemove) {
           await removeContactFromGroup(id, groupId).catch((e) => console.error("removeFromGroup failed", groupId, e.message));
         }
+
+        // Re-fetch to get fresh etag before any updateContact call below
+        if (Object.keys(patch).some(k => k !== "groups")) {
+          existing = await getContact(id);
+        }
       }
 
-      // Only call updateContact if non-group/non-linkedContacts fields are being changed.
-      // Skipping this when only groups change avoids: (1) clearing the contact name with an empty
-      // partial patch, and (2) an etag conflict caused by the membership modifications above.
-      const contactFieldKeys = Object.keys(patch).filter(k => k !== "groups" && k !== "linkedContacts");
+      // Call updateContact for any non-group field changes (including linkedContacts → userDefined)
+      const contactFieldKeys = Object.keys(patch).filter(k => k !== "groups");
       if (contactFieldKeys.length > 0) {
-        // Re-fetch to get the fresh etag after any membership modifications
-        const fresh = await getContact(id);
-        const updated = toGooglePerson(patch, fresh);
+        const updated = toGooglePerson(patch, existing);
         const result = await updateContact(id, updated);
         return res.json(toContact(result));
       }
 
+      // Groups-only change: return the current state
       const refreshed = await getContact(id);
       return res.json(toContact(refreshed));
     }
