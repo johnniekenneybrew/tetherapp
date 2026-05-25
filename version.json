@@ -1,0 +1,35 @@
+{
+  "version": "2.1.0",
+  "changelog": [
+    {
+      "version": "2.1.0",
+      "type": "minor",
+      "date": "May 25, 2026",
+      "notes": "Mega confetti explosion with spring physics, linked contacts saved to Google, undo daily check-in"
+    },
+    {
+      "version": "2.0.1",
+      "type": "fix",
+      "date": "May 24, 2026",
+      "notes": "Fixed group membership persistence, patch-aware contact updates, system groups filtering"
+    },
+    {
+      "version": "2.0.0",
+      "type": "major",
+      "date": "May 23, 2026",
+      "notes": "Migrated to Google Contacts API, replaced Notion-based contacts with native sync"
+    },
+    {
+      "version": "1.5.0",
+      "type": "minor",
+      "date": "May 15, 2026",
+      "notes": "Added linked contacts, 3-step contact linking flow with optional group names"
+    },
+    {
+      "version": "1.4.2",
+      "type": "fix",
+      "date": "May 10, 2026",
+      "notes": "Fixed habit completion sync, improved routine scheduling"
+    }
+  ]
+}
