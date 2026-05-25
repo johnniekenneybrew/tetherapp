@@ -1244,32 +1244,42 @@ textarea.input.is-filled--green {
   inset: 0;
   pointer-events: none;
   z-index: 60;
-  /* no overflow:hidden so particles can reach every corner */
 }
 .emoji-rain span {
   position: absolute;
   left: 50%;
-  top: 65%;  /* launch from lower portion so explosion goes UP */
+  top: 65%;
   user-select: none;
   will-change: transform, opacity;
-  animation: burst var(--dur, 2000ms) cubic-bezier(0.1, 0.8, 0.3, 1) both;
-  animation-delay: var(--delay, 0ms);
+  animation: burst var(--dur, 2200ms) cubic-bezier(0.05, 0.85, 0.25, 1) both;
+}
+.emoji-rain .confetti-piece {
+  position: absolute;
+  left: 50%;
+  top: 65%;
+  will-change: transform, opacity;
+  animation:
+    confetti-fly var(--dur, 2200ms) cubic-bezier(0.05, 0.85, 0.25, 1) both,
+    confetti-spin var(--sd, 0.35s) linear infinite;
 }
 @keyframes burst {
-  0%   {
-    transform: translate(-50%, -50%) scale(0) rotate(0deg);
-    opacity: 1;
-  }
-  8%   {
-    transform: translate(-50%, -50%) scale(1.6) rotate(calc(var(--r) * 0.03));
-    opacity: 1;
-  }
+  0%   { transform: translate(-50%, -50%) scale(0) rotate(0deg); opacity: 1; }
+  7%   { transform: translate(-50%, -50%) scale(1.8) rotate(calc(var(--r) * 0.02)); opacity: 1; }
   75%  { opacity: 1; }
   100% {
-    transform: translate(calc(-50% + var(--tx, 0px)), calc(-50% + var(--ty, -300px)))
-               scale(0.15) rotate(var(--r, 360deg));
+    transform: translate(calc(-50% + var(--tx, 0px)), calc(-50% + var(--ty, -400px)))
+               scale(0.1) rotate(var(--r, 360deg));
     opacity: 0;
   }
+}
+@keyframes confetti-fly {
+  0%   { translate: -50% -50%; scale: 0; opacity: 1; }
+  7%   { translate: -50% -50%; scale: 1.2; opacity: 1; }
+  75%  { opacity: 1; }
+  100% { translate: calc(-50% + var(--tx)) calc(-50% + var(--ty)); scale: 0.3; opacity: 0; }
+}
+@keyframes confetti-spin {
+  to { rotate: 720deg; }
 }
 
 /* ----------------- Modal ----------------- */

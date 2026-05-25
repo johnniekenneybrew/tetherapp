@@ -100,27 +100,42 @@ export function StatusBadge({ status }) {
 // ----------- Emoji confetti explosion -----------
 
 const BURST_EMOJI = ["🎉","✨","🌟","💫","🌈","🎊","🏆","💎","🔥","⭐","🌸","🍀","💚","🌻","☀️","🧡"];
+const CONFETTI_COLORS = ["#ff4757","#ffa502","#2ed573","#1e90ff","#ff6b81","#eccc68","#a29bfe","#fd79a8","#00cec9","#fdcb6e","#ff6348","#7bed9f"];
 
-export function EmojiRain({ duration = 3200, count = 120, onDone }) {
-  const pieces = useMemo(() => {
-    return Array.from({ length: count }).map((_, i) => {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 250 + Math.random() * 550; // fast enough to reach screen edges
-      const tx = Math.round(Math.cos(angle) * speed);
-      // Strong upward bias: subtract 480px so everything shoots up
-      const ty = Math.round(Math.sin(angle) * speed - 480);
-      return {
-        e: BURST_EMOJI[Math.floor(Math.random() * BURST_EMOJI.length)],
-        tx: tx + "px",
-        ty: ty + "px",
-        delay: Math.random() * 120,
-        dur: 1800 + Math.random() * 1400,
-        size: 28 + Math.random() * 36,  // 28–64px
-        rot: (Math.random() * 1080 - 540) + "deg",
-        key: i,
-      };
-    });
-  }, [count]);
+function makeParticle(speedMin, speedMax, upwardBias) {
+  const angle = Math.random() * Math.PI * 2;
+  const speed = speedMin + Math.random() * (speedMax - speedMin);
+  return {
+    tx: Math.round(Math.cos(angle) * speed) + "px",
+    ty: Math.round(Math.sin(angle) * speed - upwardBias) + "px",
+  };
+}
+
+export function EmojiRain({ duration = 3600, count = 160, onDone }) {
+  const emojis = useMemo(() => Array.from({ length: count }).map((_, i) => ({
+    ...makeParticle(350, 950, 650),
+    e: BURST_EMOJI[Math.floor(Math.random() * BURST_EMOJI.length)],
+    delay: Math.random() * 100,
+    dur: 2000 + Math.random() * 1600,
+    size: 36 + Math.random() * 52,   // 36–88px
+    rot: (Math.random() * 1440 - 720) + "deg",
+    key: i,
+  })), [count]);
+
+  const confetti = useMemo(() => Array.from({ length: 220 }).map((_, i) => {
+    const isCircle = Math.random() < 0.25;
+    return {
+      ...makeParticle(320, 900, 620),
+      color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
+      delay: Math.random() * 100,
+      dur: 2000 + Math.random() * 1600,
+      sd: (0.25 + Math.random() * 0.35).toFixed(2) + "s",
+      w: isCircle ? "14px" : (7 + Math.floor(Math.random() * 10)) + "px",
+      h: isCircle ? "14px" : (14 + Math.floor(Math.random() * 8)) + "px",
+      br: isCircle ? "50%" : "2px",
+      key: i,
+    };
+  }), []);
 
   useEffect(() => {
     const t = setTimeout(() => onDone && onDone(), duration);
@@ -129,18 +144,21 @@ export function EmojiRain({ duration = 3200, count = 120, onDone }) {
 
   return (
     <div className="emoji-rain" aria-hidden="true">
-      {pieces.map((p) => (
-        <span key={p.key}
-          style={{
-            "--tx": p.tx,
-            "--ty": p.ty,
-            "--r": p.rot,
-            animationDelay: p.delay + "ms",
-            animationDuration: p.dur + "ms",
-            fontSize: p.size + "px",
-          }}>
-          {p.e}
-        </span>
+      {emojis.map((p) => (
+        <span key={p.key} style={{
+          "--tx": p.tx, "--ty": p.ty, "--r": p.rot,
+          animationDelay: p.delay + "ms",
+          animationDuration: p.dur + "ms",
+          fontSize: p.size + "px",
+        }}>{p.e}</span>
+      ))}
+      {confetti.map((c) => (
+        <div key={c.key} className="confetti-piece" style={{
+          "--tx": c.tx, "--ty": c.ty, "--dur": c.dur + "ms", "--sd": c.sd,
+          animationDelay: c.delay + "ms",
+          width: c.w, height: c.h,
+          background: c.color, borderRadius: c.br,
+        }} />
       ))}
     </div>
   );
