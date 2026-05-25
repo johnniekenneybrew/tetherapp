@@ -1,7 +1,14 @@
-import { notion, DB, ACC_MAP, ACC_REVERSE, P, p, queryAll, setCors } from "./_notion.js";
+import { setCors } from "./_notion.js";
+import {
+  listTasks, listCompletedTasks, getTask,
+  createTask, updateTask, closeTask, reopenTask, deleteTask,
+} from "./_todoist.js";
 
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
-const TODAY_MS = new Date(TODAY_ISO + "T00:00:00").getTime();
+const TODAY_MS  = new Date(TODAY_ISO + "T00:00:00").getTime();
+
+// These label names must match the account IDs in the frontend (getro, jones, personal)
+const ACCOUNT_LABELS = ["getro", "jones", "personal"];
 
 function isoToDue(iso) {
   if (!iso) return null;
@@ -15,29 +22,41 @@ function dueToIso(days) {
   return d.toISOString().slice(0, 10);
 }
 
-function completedDayLabel(iso) {
-  if (!iso) return null;
+function completedDayLabel(isoString) {
+  if (!isoString) return null;
+  const iso = isoString.slice(0, 10);
   if (iso === TODAY_ISO) return "today";
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   return days[new Date(iso + "T12:00:00").getDay()];
 }
 
-function toTask(page, subtasksMap) {
-  const props = page.properties;
-  const completedDate = p.date(props["Completed Date"]);
+// Todoist priority: 4 = urgent (p1 in UI) → our priority:true
+//                  1 = normal (p4 in UI) → our priority:false
+function toTetherPriority(todoistPriority) {
+  return todoistPriority === 4;
+}
+function toTodoistPriority(tetherPriority) {
+  return tetherPriority ? 4 : 1;
+}
+
+function accountFromLabels(labels = []) {
+  return labels.find(l => ACCOUNT_LABELS.includes(l)) || "personal";
+}
+
+function toTask(t, subtasksMap = {}) {
+  const completedAt = t.completed_at || t.completedAt || null;
   return {
-    _pageId: page.id,
-    id: page.id,
-    title: p.title(props.Title),
-    account: ACC_REVERSE[p.select(props.Account)] || "personal",
-    done: p.checkbox(props.Done),
-    priority: p.checkbox(props.Priority),
-    details: p.rich(props.Details) || null,
-    due: isoToDue(p.date(props["Due Date"])),
-    completedDay: completedDayLabel(completedDate),
+    id:           t.id,
+    title:        t.content,
+    account:      accountFromLabels(t.labels),
+    done:         !!(t.is_completed || completedAt),
+    priority:     toTetherPriority(t.priority),
+    details:      t.description || null,
+    due:          isoToDue(t.due?.date || null),
+    completedDay: completedAt ? completedDayLabel(completedAt) : null,
     completedAgo: null,
-    subtasks: subtasksMap ? (subtasksMap[page.id] || []) : [],
-    _parentIds: p.relation(props["Parent Task"]),
+    subtasks:     subtasksMap[t.id] || [],
+    _parentId:    t.parent_id || null,
   };
 }
 
@@ -46,82 +65,105 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
 
   try {
+    // ── GET ──────────────────────────────────────────────────
     if (req.method === "GET") {
-      const pages = await queryAll(DB.TASKS);
+      // Active tasks
+      const active = await listTasks();
 
-      // Build subtask map: parentId -> [{ id, text, done }]
+      // Recently completed tasks (last 7 days) for "completed this week" display
+      let completed = [];
+      try {
+        const since = new Date(TODAY_MS - 6 * 86400000).toISOString();
+        const result = await listCompletedTasks({ since });
+        // v1 may return { items: [...] } or an array directly
+        completed = Array.isArray(result) ? result : (result?.items || []);
+      } catch {
+        // endpoint may require premium — silently skip
+      }
+
+      const all = [...active, ...completed];
+
+      // Build subtask map: parentId → [{ id, text, done }]
       const subtasksMap = {};
-      for (const page of pages) {
-        const parentIds = p.relation(page.properties["Parent Task"]);
-        if (parentIds.length > 0) {
-          const parentId = parentIds[0];
-          if (!subtasksMap[parentId]) subtasksMap[parentId] = [];
-          subtasksMap[parentId].push({
-            id: page.id,
-            text: p.title(page.properties.Title),
-            done: p.checkbox(page.properties.Done),
+      for (const t of all) {
+        if (t.parent_id) {
+          if (!subtasksMap[t.parent_id]) subtasksMap[t.parent_id] = [];
+          subtasksMap[t.parent_id].push({
+            id:   t.id,
+            text: t.content,
+            done: !!(t.is_completed || t.completed_at),
           });
         }
       }
 
-      // Return only top-level tasks (no parent)
-      const result = pages
-        .filter(page => p.relation(page.properties["Parent Task"]).length === 0)
-        .map(page => {
-          const t = toTask(page, subtasksMap);
-          delete t._parentIds;
-          return t;
-        });
+      // Top-level tasks only
+      const tasks = all
+        .filter(t => !t.parent_id)
+        .map(t => { const mapped = toTask(t, subtasksMap); delete mapped._parentId; return mapped; });
 
-      return res.json(result);
+      return res.json(tasks);
     }
 
+    // ── POST (create) ─────────────────────────────────────────
     if (req.method === "POST") {
       const { title, account, done, priority, details, due, parentId } = req.body;
-      const properties = {
-        Title:      P.title(title),
-        Account:    P.select(ACC_MAP[account] || "Personal"),
-        Done:       P.checkbox(done ?? false),
-        Priority:   P.checkbox(priority ?? false),
-        Details:    P.rich(details || ""),
-        "Due Date": P.date(dueToIso(due)),
+
+      const labels = ACCOUNT_LABELS.includes(account) ? [account] : ["personal"];
+      const payload = {
+        content:     title,
+        description: details || "",
+        labels,
+        priority:    toTodoistPriority(priority),
       };
-      if (parentId) properties["Parent Task"] = P.relation([parentId]);
-      const page = await notion.pages.create({
-        parent: { database_id: DB.TASKS },
-        properties,
-      });
-      const t = toTask(page, {});
-      delete t._parentIds;
-      return res.json(t);
+      if (due != null) payload.due_date = dueToIso(due);
+      if (parentId)    payload.parent_id = parentId;
+
+      const task = await createTask(payload);
+      if (done) await closeTask(task.id);
+
+      const mapped = toTask(done ? { ...task, is_completed: true, completed_at: new Date().toISOString() } : task);
+      delete mapped._parentId;
+      return res.json(mapped);
     }
 
+    // ── PATCH (update) ────────────────────────────────────────
     if (req.method === "PATCH") {
       const { id, ...patch } = req.body;
       if (!id) return res.status(400).json({ error: "id required" });
 
       const updates = {};
-      if (patch.title    !== undefined) updates.Title      = P.title(patch.title);
-      if (patch.account  !== undefined) updates.Account    = P.select(ACC_MAP[patch.account] || "Personal");
-      if (patch.done     !== undefined) updates.Done       = P.checkbox(patch.done);
-      if (patch.priority !== undefined) updates.Priority   = P.checkbox(patch.priority);
-      if (patch.details  !== undefined) updates.Details    = P.rich(patch.details || "");
-      if (patch.due      !== undefined) updates["Due Date"] = P.date(dueToIso(patch.due));
-      if (patch.completedDay !== undefined) {
-        updates["Completed Date"] = P.date(patch.completedDay === "today" ? TODAY_ISO : null);
+      if (patch.title    !== undefined) updates.content     = patch.title;
+      if (patch.details  !== undefined) updates.description = patch.details || "";
+      if (patch.priority !== undefined) updates.priority    = toTodoistPriority(patch.priority);
+      if (patch.due      !== undefined) updates.due_date    = dueToIso(patch.due);
+      if (patch.account  !== undefined) {
+        updates.labels = ACCOUNT_LABELS.includes(patch.account) ? [patch.account] : ["personal"];
       }
-      // subtasks patch: skip Notion sync (managed via Parent Task relation)
 
-      const page = await notion.pages.update({ page_id: id, properties: updates });
-      const t = toTask(page, null);
-      delete t._parentIds;
-      return res.json(t);
+      if (Object.keys(updates).length > 0) await updateTask(id, updates);
+
+      // Completion toggle
+      if (patch.done === true)  await closeTask(id);
+      if (patch.done === false) await reopenTask(id);
+
+      // Return updated shape (getTask fails for closed tasks, so reconstruct)
+      let fresh = null;
+      if (patch.done !== true) {
+        try { fresh = await getTask(id); } catch { /* closed tasks not fetchable */ }
+      }
+
+      const result = fresh
+        ? toTask(fresh)
+        : { id, ...patch, completedDay: patch.done ? "today" : null };
+      delete result._parentId;
+      return res.json(result);
     }
 
+    // ── DELETE ────────────────────────────────────────────────
     if (req.method === "DELETE") {
       const { id } = req.body;
       if (!id) return res.status(400).json({ error: "id required" });
-      await notion.pages.update({ page_id: id, archived: true });
+      await deleteTask(id);
       return res.json({ ok: true });
     }
 

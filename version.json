@@ -1,6 +1,12 @@
 {
-  "version": "2.1.0",
+  "version": "2.2.0",
   "changelog": [
+    {
+      "version": "2.2.0",
+      "type": "minor",
+      "date": "May 25, 2026",
+      "notes": "Migrated to-do list from Notion to Todoist API — full read/write sync with labels for areas"
+    },
     {
       "version": "2.1.0",
       "type": "minor",
