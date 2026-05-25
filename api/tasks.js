@@ -86,7 +86,8 @@ export default async function handler(req, res) {
     // ── GET ──────────────────────────────────────────────────
     if (req.method === "GET") {
       // Active tasks
-      const active = await listTasks();
+      const activeRaw = await listTasks();
+      const active = Array.isArray(activeRaw) ? activeRaw : (activeRaw?.results || activeRaw?.items || []);
 
       // Recently completed tasks (last 7 days) for "completed this week" display
       let completed = [];
