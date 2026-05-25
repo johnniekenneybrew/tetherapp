@@ -545,6 +545,39 @@ textarea.input.is-filled--green {
   margin-top: 4px;
 }
 .todo-meta .meta-due.is-overdue { color: var(--error); font-weight: 500; }
+
+.due-bubbles {
+  display: flex;
+  gap: 5px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.due-bubble {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border-soft);
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: border-color 100ms, color 100ms, background 100ms;
+  line-height: 1;
+}
+.due-bubble:hover {
+  border-color: var(--border);
+  color: var(--text-2);
+  background: var(--surface-2);
+}
+.due-bubble.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
 .todo-actions {
   display: flex;
   align-items: center;
