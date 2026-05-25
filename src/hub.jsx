@@ -1015,6 +1015,15 @@ function WamTab({ state }) {
 
 // ----------- Settings tab -----------
 
+const APP_VERSION = "2.1.0";
+const VERSION_CHANGELOG = [
+  { version: "2.1.0", type: "minor", date: "May 25, 2026", notes: "Mega confetti explosion with spring physics, linked contacts saved to Google, undo daily check-in" },
+  { version: "2.0.1", type: "fix", date: "May 24, 2026", notes: "Fixed group membership persistence, patch-aware contact updates, system groups filtering" },
+  { version: "2.0.0", type: "major", date: "May 23, 2026", notes: "Migrated to Google Contacts API, replaced Notion-based contacts with native sync" },
+  { version: "1.5.0", type: "minor", date: "May 15, 2026", notes: "Added linked contacts, 3-step contact linking flow with optional group names" },
+  { version: "1.4.2", type: "fix", date: "May 10, 2026", notes: "Fixed habit completion sync, improved routine scheduling" },
+];
+
 const DEFAULT_AREA_COLORS = { getro: "#3B82F6", jones: "#8B5CF6", personal: "#64748B" };
 const AREA_PALETTE = ["#3B82F6", "#8B5CF6", "#64748B", "#10B981", "#F59E0B", "#EF4444", "#EC4899", "#06B6D4", "#6C63FF", "#1A1A1A"];
 
@@ -1091,6 +1100,44 @@ export function SettingsTab({ state, setState }) {
           </a>
         </div>
 
+      </div>
+
+      {/* Version & Updates */}
+      <h3 className="section-title" style={{ marginTop: 32 }}>About</h3>
+      <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+        <div style={{ padding: "16px 20px" }}>
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 4 }}>Version</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "var(--text-1)" }}>v{APP_VERSION}</div>
+          </div>
+
+          <div style={{ marginBottom: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-2)", marginBottom: 12 }}>Recent Updates</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {VERSION_CHANGELOG.map((entry, i) => (
+                <div key={i} style={{
+                  paddingBottom: i < VERSION_CHANGELOG.length - 1 ? 10 : 0,
+                  borderBottom: i < VERSION_CHANGELOG.length - 1 ? "1px solid var(--border-soft)" : "none",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--text-1)" }}>v{entry.version}</span>
+                    <span style={{
+                      fontSize: 10, fontWeight: 600, padding: "1px 6px", borderRadius: 3,
+                      background: entry.type === "major" ? "#ef4444" : entry.type === "minor" ? "#3b82f6" : "#10b981",
+                      color: "white",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
+                    }}>
+                      {entry.type}
+                    </span>
+                    <span style={{ fontSize: 10, color: "var(--text-3)", marginLeft: "auto" }}>{entry.date}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--text-2)", lineHeight: 1.4 }}>{entry.notes}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
