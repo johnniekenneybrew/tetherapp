@@ -111,27 +111,27 @@ function makeParticle(speedMin, speedMax, upwardBias) {
   };
 }
 
-export function EmojiRain({ duration = 3800, count = 220, onDone }) {
+export function EmojiRain({ duration = 4200, count = 260, onDone }) {
   const emojis = useMemo(() => Array.from({ length: count }).map((_, i) => ({
-    ...makeParticle(400, 1100, 750),
+    ...makeParticle(450, 1350, 800),
     e: BURST_EMOJI[Math.floor(Math.random() * BURST_EMOJI.length)],
-    delay: Math.random() * 90,
-    dur: 2000 + Math.random() * 1800,
-    size: 40 + Math.random() * 68,   // 40–108px
+    delay: Math.random() * 80,
+    dur: 2200 + Math.random() * 2000,
+    size: 44 + Math.random() * 84,   // 44–128px
     rot: (Math.random() * 1440 - 720) + "deg",
     key: i,
   })), [count]);
 
-  const confetti = useMemo(() => Array.from({ length: 320 }).map((_, i) => {
+  const confetti = useMemo(() => Array.from({ length: 380 }).map((_, i) => {
     const isCircle = Math.random() < 0.3;
     return {
-      ...makeParticle(380, 1050, 720),
+      ...makeParticle(430, 1300, 780),
       color: CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)],
-      delay: Math.random() * 90,
-      dur: 2000 + Math.random() * 1800,
-      sd: (0.22 + Math.random() * 0.38).toFixed(2) + "s",
-      w: isCircle ? "16px" : (9 + Math.floor(Math.random() * 12)) + "px",
-      h: isCircle ? "16px" : (16 + Math.floor(Math.random() * 10)) + "px",
+      delay: Math.random() * 80,
+      dur: 2200 + Math.random() * 2000,
+      sd: (0.2 + Math.random() * 0.4).toFixed(2) + "s",
+      w: isCircle ? "18px" : (11 + Math.floor(Math.random() * 14)) + "px",
+      h: isCircle ? "18px" : (18 + Math.floor(Math.random() * 12)) + "px",
       br: isCircle ? "50%" : "2px",
       key: i,
     };
