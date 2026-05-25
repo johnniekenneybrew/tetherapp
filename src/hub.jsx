@@ -4,6 +4,7 @@ import {
   Checkbox, AccountDot, StatusBadge, Icon,
 } from './shared';
 import { useOrder } from './useOrder';
+import versionData from '../version.json';
 
 // ============================================================
 // Habits + Health hub
@@ -1015,14 +1016,8 @@ function WamTab({ state }) {
 
 // ----------- Settings tab -----------
 
-const APP_VERSION = "2.1.0";
-const VERSION_CHANGELOG = [
-  { version: "2.1.0", type: "minor", date: "May 25, 2026", notes: "Mega confetti explosion with spring physics, linked contacts saved to Google, undo daily check-in" },
-  { version: "2.0.1", type: "fix", date: "May 24, 2026", notes: "Fixed group membership persistence, patch-aware contact updates, system groups filtering" },
-  { version: "2.0.0", type: "major", date: "May 23, 2026", notes: "Migrated to Google Contacts API, replaced Notion-based contacts with native sync" },
-  { version: "1.5.0", type: "minor", date: "May 15, 2026", notes: "Added linked contacts, 3-step contact linking flow with optional group names" },
-  { version: "1.4.2", type: "fix", date: "May 10, 2026", notes: "Fixed habit completion sync, improved routine scheduling" },
-];
+const APP_VERSION = versionData.version;
+const VERSION_CHANGELOG = versionData.changelog;
 
 const DEFAULT_AREA_COLORS = { getro: "#3B82F6", jones: "#8B5CF6", personal: "#64748B" };
 const AREA_PALETTE = ["#3B82F6", "#8B5CF6", "#64748B", "#10B981", "#F59E0B", "#EF4444", "#EC4899", "#06B6D4", "#6C63FF", "#1A1A1A"];
