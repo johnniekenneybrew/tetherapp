@@ -23,7 +23,7 @@ export function DailyCheckIn({ state, setState, navigateTo, actions }) {
   const [dragRoutineId, setDragRoutineId] = useState(null);
   const [dragOverRoutineId, setDragOverRoutineId] = useState(null);
 
-  const [priorities, setPriorities] = useState(state.checkin?.priorities ?? []);
+  const priorities = (state.todos || []).filter(t => t.priority && t.due === 0);
   const [newPriority, setNewPriority] = useState("");
   const [newAccount, setNewAccount] = useState("getro");
   const [gratitude, setGratitude] = useState(state.checkin?.gratitude || ["", "", ""]);
@@ -38,9 +38,9 @@ export function DailyCheckIn({ state, setState, navigateTo, actions }) {
   useEffect(() => {
     setState((s) => ({
       ...s,
-      checkin: { ...s.checkin, priorities, gratitude, learnings, sectionsDone },
+      checkin: { ...s.checkin, gratitude, learnings, sectionsDone },
     }));
-  }, [priorities, gratitude, learnings, sectionsDone]);
+  }, [gratitude, learnings, sectionsDone]);
 
   const prioritiesReady = priorities.length >= 1 || newPriority.trim().length > 0;
   const habitsReady = true;
@@ -69,35 +69,25 @@ export function DailyCheckIn({ state, setState, navigateTo, actions }) {
     setTimeout(() => navigateTo({ page: "todo" }), 900);
   };
 
-  const addPriority = (currentPriorities = priorities) => {
-    if (!newPriority.trim() || currentPriorities.length >= 5) return null;
-    const item = { id: Date.now(), text: newPriority.trim(), account: newAccount, done: false };
-    const next = [...currentPriorities, item];
-    setPriorities(next);
+  const addPriority = () => {
+    if (!newPriority.trim() || priorities.length >= 5) return;
+    const tempId = 'pri-' + Date.now();
+    actions.addTodo({ id: tempId, title: newPriority.trim(), account: newAccount, done: false, priority: true, due: 0, subtasks: [] });
     setNewPriority("");
     setSectionsDone((s) => ({ ...s, priorities: false }));
-    actions.updateCheckin({ priorities: next });
-    return next;
   };
   const togglePriorityDone = (id) => {
-    const next = priorities.map((p) => p.id === id ? { ...p, done: !p.done } : p);
-    setPriorities(next);
-    actions.updateCheckin({ priorities: next });
+    actions.toggleDone(id);
   };
   const removePriority = (id) => {
-    const next = priorities.filter((p) => p.id !== id);
-    setPriorities(next);
     setSectionsDone((s) => ({ ...s, priorities: false }));
-    actions.updateCheckin({ priorities: next });
+    actions.deleteTodo(id);
   };
   const markPrioritiesComplete = () => {
-    let current = priorities;
     if (newPriority.trim() && priorities.length < 5) {
-      const item = { id: Date.now(), text: newPriority.trim(), account: newAccount, done: false };
-      current = [...priorities, item];
-      setPriorities(current);
+      const tempId = 'pri-' + Date.now();
+      actions.addTodo({ id: tempId, title: newPriority.trim(), account: newAccount, done: false, priority: true, due: 0, subtasks: [] });
       setNewPriority("");
-      actions.updateCheckin({ priorities: current });
     }
     setSectionDone("priorities", true);
   };
@@ -177,7 +167,7 @@ export function DailyCheckIn({ state, setState, navigateTo, actions }) {
                         color: p.done ? "var(--text-2)" : "var(--text)",
                         textDecoration: p.done ? "line-through" : "none",
                       }}>
-                        {p.text}
+                        {p.title}
                       </span>
                       <AccountDot acc={p.account} />
                       <button className="priority-remove" onClick={() => removePriority(p.id)} title="Remove">
