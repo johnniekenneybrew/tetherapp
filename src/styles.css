@@ -1244,28 +1244,30 @@ textarea.input.is-filled--green {
   inset: 0;
   pointer-events: none;
   z-index: 60;
-  overflow: hidden;
+  /* no overflow:hidden so particles can reach every corner */
 }
 .emoji-rain span {
   position: absolute;
   left: 50%;
-  top: 42%;
+  top: 65%;  /* launch from lower portion so explosion goes UP */
   user-select: none;
-  animation: burst var(--dur, 1600ms) cubic-bezier(0.15, 0.85, 0.35, 1) both;
+  will-change: transform, opacity;
+  animation: burst var(--dur, 2000ms) cubic-bezier(0.1, 0.8, 0.3, 1) both;
   animation-delay: var(--delay, 0ms);
 }
 @keyframes burst {
   0%   {
-    transform: translate(-50%, -50%) scale(0.1) rotate(0deg);
+    transform: translate(-50%, -50%) scale(0) rotate(0deg);
     opacity: 1;
   }
-  10%  {
-    transform: translate(-50%, -50%) scale(1.4) rotate(calc(var(--r) * 0.04));
+  8%   {
+    transform: translate(-50%, -50%) scale(1.6) rotate(calc(var(--r) * 0.03));
     opacity: 1;
   }
+  75%  { opacity: 1; }
   100% {
-    transform: translate(calc(-50% + var(--tx, 0px)), calc(-50% + var(--ty, 200px)))
-               scale(0.25) rotate(var(--r, 360deg));
+    transform: translate(calc(-50% + var(--tx, 0px)), calc(-50% + var(--ty, -300px)))
+               scale(0.15) rotate(var(--r, 360deg));
     opacity: 0;
   }
 }

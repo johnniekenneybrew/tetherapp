@@ -101,22 +101,22 @@ export function StatusBadge({ status }) {
 
 const BURST_EMOJI = ["🎉","✨","🌟","💫","🌈","🎊","🏆","💎","🔥","⭐","🌸","🍀","💚","🌻","☀️","🧡"];
 
-export function EmojiRain({ duration = 2800, count = 72, onDone }) {
+export function EmojiRain({ duration = 3200, count = 120, onDone }) {
   const pieces = useMemo(() => {
     return Array.from({ length: count }).map((_, i) => {
-      const angle = (Math.random() * Math.PI * 2);
-      const speed = 80 + Math.random() * 300;
-      // gravity: add a downward bias so arcs feel physical
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 250 + Math.random() * 550; // fast enough to reach screen edges
       const tx = Math.round(Math.cos(angle) * speed);
-      const ty = Math.round(Math.sin(angle) * speed + 340);
+      // Strong upward bias: subtract 480px so everything shoots up
+      const ty = Math.round(Math.sin(angle) * speed - 480);
       return {
         e: BURST_EMOJI[Math.floor(Math.random() * BURST_EMOJI.length)],
         tx: tx + "px",
         ty: ty + "px",
-        delay: Math.random() * 180,
-        dur: 1300 + Math.random() * 900,
-        size: 20 + Math.random() * 24,
-        rot: (Math.random() * 900 - 450) + "deg",
+        delay: Math.random() * 120,
+        dur: 1800 + Math.random() * 1400,
+        size: 28 + Math.random() * 36,  // 28–64px
+        rot: (Math.random() * 1080 - 540) + "deg",
         key: i,
       };
     });
