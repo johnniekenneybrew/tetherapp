@@ -26,7 +26,8 @@ All endpoints in `/api/*.js`:
 - `prefs.js` — User preferences (Notion `_prefs` table)
 
 ### Database
-**Notion**: Primary storage for all app data (tasks, habits, contacts, notes, preferences)
+**Notion**: Storage for habits, routines, goals, check-ins, preferences, contact notes
+**Todoist**: Tasks and subtasks (full read/write via Todoist API v1)
 **Google Contacts**: Real-time sync for contacts + groups (via Google People API)
 
 ---
@@ -88,8 +89,31 @@ All endpoints in `/api/*.js`:
 
 ---
 
+## Todoist Integration
+
+**API**: Todoist API v1 — `https://api.todoist.com/api/v1`
+**Wrapper**: `api/_todoist.js`
+
+**Field Mapping** (Tether → Todoist):
+| Tether | Todoist |
+|--------|---------|
+| title | content |
+| account | labels (one of: getro, jones, personal) |
+| done | is_completed / close endpoint |
+| priority (bool) | priority (4=urgent/true, 1=normal/false) |
+| details | description |
+| due (days offset) | due_date (ISO string) |
+| subtasks | child tasks via parent_id |
+| completedDay | computed from completed_at |
+
+**Completed tasks**: `GET /tasks/completed/get_all?since=<7-days-ago>` — may require premium.
+Falls back to empty silently if unavailable.
+
+**Accounts as Labels**: The labels `getro`, `jones`, `personal` must exist in the user's Todoist account. Tasks carry exactly one account label.
+
 ## Environment Variables (Vercel)
 ```
+TODOIST_API_TOKEN          # Todoist API token (from Settings → Developer)
 GOOGLE_CLIENT_ID           # OAuth client ID
 GOOGLE_CLIENT_SECRET       # OAuth client secret
 GOOGLE_REFRESH_TOKEN       # Stored after first auth (or in Notion prefs)
