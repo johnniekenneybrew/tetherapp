@@ -121,7 +121,15 @@ export function DailyCheckIn({ state, setState, navigateTo, actions }) {
     <div className="page fade-in" style={{ maxWidth: 960 }}>
       {showBanner && (
         <div className="completion-banner">
-          <Icon.Check /> Morning Check-In Complete
+          <span><Icon.Check /> Morning Check-In Complete</span>
+          <button className="btn-text" style={{ fontSize: 12, opacity: 0.6 }} onClick={() => {
+            const reset = { priorities: false, habits: false, gratitude: false, learnings: false };
+            setShowBanner(false);
+            triggeredRef.current = false;
+            setSectionsDone(reset);
+            setState((s) => ({ ...s, checkin: { ...s.checkin, completed: false, sectionsDone: reset } }));
+            actions.updateCheckin({ completed: false, sectionsDone: reset });
+          }}>Undo</button>
         </div>
       )}
 
