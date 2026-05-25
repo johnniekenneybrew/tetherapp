@@ -97,21 +97,29 @@ export function StatusBadge({ status }) {
   return <span className={`badge ${cls}`}>{label}</span>;
 }
 
-// ----------- Emoji rain -----------
+// ----------- Emoji confetti explosion -----------
 
-const RAIN_EMOJI = ["🎉","✨","🌟","💫","🌈","🎊","🏆","💎","🔥","⭐","🌸","🍀","💚","🌻","☀️","🧡"];
+const BURST_EMOJI = ["🎉","✨","🌟","💫","🌈","🎊","🏆","💎","🔥","⭐","🌸","🍀","💚","🌻","☀️","🧡"];
 
-export function EmojiRain({ duration = 2800, count = 56, onDone }) {
+export function EmojiRain({ duration = 2800, count = 72, onDone }) {
   const pieces = useMemo(() => {
-    return Array.from({ length: count }).map((_, i) => ({
-      e: RAIN_EMOJI[Math.floor(Math.random() * RAIN_EMOJI.length)],
-      left: Math.random() * 100,
-      delay: Math.random() * 600,
-      dur: 1800 + Math.random() * 1800,
-      size: 22 + Math.random() * 22,
-      rot: (Math.random() * 720 - 360) + "deg",
-      key: i,
-    }));
+    return Array.from({ length: count }).map((_, i) => {
+      const angle = (Math.random() * Math.PI * 2);
+      const speed = 80 + Math.random() * 300;
+      // gravity: add a downward bias so arcs feel physical
+      const tx = Math.round(Math.cos(angle) * speed);
+      const ty = Math.round(Math.sin(angle) * speed + 340);
+      return {
+        e: BURST_EMOJI[Math.floor(Math.random() * BURST_EMOJI.length)],
+        tx: tx + "px",
+        ty: ty + "px",
+        delay: Math.random() * 180,
+        dur: 1300 + Math.random() * 900,
+        size: 20 + Math.random() * 24,
+        rot: (Math.random() * 900 - 450) + "deg",
+        key: i,
+      };
+    });
   }, [count]);
 
   useEffect(() => {
@@ -124,11 +132,12 @@ export function EmojiRain({ duration = 2800, count = 56, onDone }) {
       {pieces.map((p) => (
         <span key={p.key}
           style={{
-            left: p.left + "%",
+            "--tx": p.tx,
+            "--ty": p.ty,
+            "--r": p.rot,
             animationDelay: p.delay + "ms",
             animationDuration: p.dur + "ms",
             fontSize: p.size + "px",
-            "--r": p.rot,
           }}>
           {p.e}
         </span>
