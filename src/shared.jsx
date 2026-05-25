@@ -58,6 +58,7 @@ export const Icon = {
   Sun: (p) => (<svg width="14" height="14" viewBox="0 0 14 14" fill="none" {...p}><circle cx="7" cy="7" r="2.5" stroke="currentColor" strokeWidth="1.4"/><path d="M7 1.5v1.5M7 11v1.5M1.5 7H3M11 7h1.5M3 3l1 1M10 10l1 1M3 11l1-1M10 4l1-1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>),
   Grip: (p) => (<svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor" {...p}><circle cx="3" cy="3.5" r="1.2"/><circle cx="7" cy="3.5" r="1.2"/><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="3" cy="10.5" r="1.2"/><circle cx="7" cy="10.5" r="1.2"/></svg>),
   GripH: (p) => (<svg width="14" height="6" viewBox="0 0 14 6" fill="currentColor" {...p}><circle cx="2" cy="1.5" r="1.1"/><circle cx="7" cy="1.5" r="1.1"/><circle cx="12" cy="1.5" r="1.1"/><circle cx="2" cy="4.5" r="1.1"/><circle cx="7" cy="4.5" r="1.1"/><circle cx="12" cy="4.5" r="1.1"/></svg>),
+  Clock: (p) => (<svg width="13" height="13" viewBox="0 0 14 14" fill="none" {...p}><circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.4"/><path d="M7 4V7l2 1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/></svg>),
 };
 
 // ----------- Primitives -----------

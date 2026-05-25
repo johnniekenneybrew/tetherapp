@@ -426,6 +426,29 @@ function TodoRow({ t, expanded, onExpand, onToggle, onTogglePriority, onDelete, 
           {showCompletedAgo && <span>Completed {t.completedAgo || "earlier today"}</span>}
         </div>
 
+        {!t.done && (
+          <div className="due-bubbles">
+            <button
+              className={"due-bubble" + (t.due === 0 ? " is-active" : "")}
+              onClick={() => onUpdate({ due: t.due === 0 ? null : 0 })}
+              title="Due today">
+              <Icon.Sun /> Today
+            </button>
+            <button
+              className={"due-bubble" + (t.due === 1 ? " is-active" : "")}
+              onClick={() => onUpdate({ due: t.due === 1 ? null : 1 })}
+              title="Due tomorrow">
+              <Icon.Cal /> Tmrw
+            </button>
+            <button
+              className={"due-bubble" + (editingDate ? " is-active" : "")}
+              onClick={() => setEditingDate(v => !v)}
+              title="Pick a date">
+              <Icon.Clock />
+            </button>
+          </div>
+        )}
+
         {expanded && (
           <div className="fade-in" style={{ marginTop: 10, padding: "10px 12px", background: "var(--surface)", borderRadius: 8, fontSize: 13, color: "var(--text-2)" }}>
             {t.details || <span className="muted">No details yet.</span>}
