@@ -9,7 +9,8 @@ import {
 let labelsEnsured = false;
 async function ensureAccountLabels() {
   if (labelsEnsured) return;
-  const existing = await listLabels();
+  const raw = await listLabels();
+  const existing = Array.isArray(raw) ? raw : (raw?.results || raw?.items || []);
   const existingNames = new Set(existing.map(l => l.name));
   await Promise.all(
     ACCOUNT_LABELS
