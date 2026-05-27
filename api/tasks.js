@@ -59,12 +59,17 @@ function accountFromLabels(labels = []) {
   return labels.find(l => ACCOUNT_LABELS.includes(l)) || "personal";
 }
 
+function isParked(labels = []) {
+  return labels.includes("parked");
+}
+
 function toTask(t, subtasksMap = {}) {
   const completedAt = t.completed_at || t.completedAt || null;
   return {
     id:           t.id,
     title:        t.content,
     account:      accountFromLabels(t.labels),
+    parked:       isParked(t.labels),
     done:         !!(t.is_completed || completedAt),
     priority:     toTetherPriority(t.priority),
     details:      t.description || null,
@@ -125,9 +130,10 @@ export default async function handler(req, res) {
 
     // ── POST (create) ─────────────────────────────────────────
     if (req.method === "POST") {
-      const { title, account, done, priority, details, due, parentId } = req.body;
+      const { title, account, done, priority, details, due, parentId, parked } = req.body;
 
       const labels = ACCOUNT_LABELS.includes(account) ? [account] : ["personal"];
+      if (parked) labels.push("parked");
       const payload = {
         content:     title,
         description: details || "",
@@ -155,8 +161,18 @@ export default async function handler(req, res) {
       if (patch.details  !== undefined) updates.description = patch.details || "";
       if (patch.priority !== undefined) updates.priority    = toTodoistPriority(patch.priority);
       if (patch.due      !== undefined) updates.due_date    = dueToIso(patch.due);
-      if (patch.account  !== undefined) {
-        updates.labels = ACCOUNT_LABELS.includes(patch.account) ? [patch.account] : ["personal"];
+
+      // Handle account and parked labels together
+      if (patch.account !== undefined || patch.parked !== undefined) {
+        let existing = null;
+        if (patch.account === undefined || patch.parked === undefined) {
+          try { existing = await getTask(id); } catch { /* task not fetchable */ }
+        }
+        const account = patch.account !== undefined ? patch.account : accountFromLabels(existing?.labels || []);
+        const parked = patch.parked !== undefined ? patch.parked : isParked(existing?.labels || []);
+        const labels = ACCOUNT_LABELS.includes(account) ? [account] : ["personal"];
+        if (parked) labels.push("parked");
+        updates.labels = labels;
       }
 
       if (Object.keys(updates).length > 0) await updateTask(id, updates);
