@@ -72,7 +72,7 @@ export function DailyCheckIn({ state, setState, navigateTo, actions }) {
   const addPriority = () => {
     if (!newPriority.trim() || priorities.length >= 5) return;
     const tempId = 'pri-' + Date.now();
-    actions.addTodo({ id: tempId, title: newPriority.trim(), account: newAccount, done: false, due: 0, subtasks: [] });
+    actions.addTodo({ id: tempId, title: newPriority.trim(), account: newAccount, done: false, due: 0, priority: true, subtasks: [] });
     setNewPriority("");
     setSectionsDone((s) => ({ ...s, priorities: false }));
   };
@@ -86,7 +86,7 @@ export function DailyCheckIn({ state, setState, navigateTo, actions }) {
   const markPrioritiesComplete = () => {
     if (newPriority.trim() && priorities.length < 5) {
       const tempId = 'pri-' + Date.now();
-      actions.addTodo({ id: tempId, title: newPriority.trim(), account: newAccount, done: false, due: 0, subtasks: [] });
+      actions.addTodo({ id: tempId, title: newPriority.trim(), account: newAccount, done: false, due: 0, priority: true, subtasks: [] });
       setNewPriority("");
     }
     setSectionDone("priorities", true);
