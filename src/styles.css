@@ -164,6 +164,9 @@ input, textarea, select { font-family: inherit; color: inherit; }
   font-weight: 600;
 }
 
+/* Mobile nav - hidden on desktop, shown via media query */
+.mobile-nav { display: none; position: relative; }
+
 .topbar-right {
   margin-left: auto;
   display: flex;
@@ -2117,4 +2120,86 @@ textarea.input.is-filled--green {
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   Mobile (≤640px)
+   ============================================================ */
+@media (max-width: 640px) {
+  /* Compact topbar */
+  .topbar-inner {
+    padding: 10px 16px;
+    gap: 10px;
+  }
+
+  /* Hide desktop nav & right-side chrome, show mobile dropdown */
+  .nav { display: none !important; }
+  .nav-divider { display: none; }
+  .hint { display: none; }
+  .mobile-nav { display: block; }
+
+  /* Mobile nav button */
+  .mobile-nav-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 12px;
+    background: var(--surface-2);
+    border-radius: var(--r-md);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    transition: background var(--t-fast), color var(--t-fast);
+  }
+  .mobile-nav-btn.is-open {
+    background: #1A1A1A;
+    color: #fff;
+  }
+
+  /* Mobile nav dropdown menu */
+  .mobile-nav-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 210px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-pop);
+    padding: 4px;
+    z-index: 40;
+  }
+  .mobile-nav-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 11px 14px;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    border-radius: var(--r-md);
+    transition: background var(--t-fast);
+  }
+  .mobile-nav-item:hover,
+  .mobile-nav-item:active { background: var(--surface); }
+  .mobile-nav-item.is-active {
+    background: #1A1A1A;
+    color: #fff;
+    font-weight: 600;
+  }
+
+  /* Compact page content */
+  .page {
+    padding: 20px 16px 80px;
+  }
+
+  /* Checkin grid always single-column */
+  .checkin-grid { grid-template-columns: 1fr; }
+
+  /* Smaller section headings */
+  h1.page-title { font-size: 22px; }
+
+  /* Cards with less inner padding */
+  .card { padding: 16px; }
 }
