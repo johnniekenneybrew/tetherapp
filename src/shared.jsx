@@ -170,8 +170,10 @@ export function EmojiRain({ duration = 4200, count = 260, onDone }) {
 export function TopBar({ route, setRoute, dateLabel, onHubTab }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropOpen, setDropOpen] = useState(null);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const menuTimer = useRef(null);
   const dropTimer = useRef(null);
+  const mobileNavRef = useRef(null);
   const { user } = useUser();
   const { signOut } = useClerk();
 
@@ -200,12 +202,31 @@ export function TopBar({ route, setRoute, dateLabel, onHubTab }) {
     { id: "contacts", label: "Contacts" },
   ];
 
+  const allNavItems = [
+    { id: "checkin", label: "Daily Check-In" },
+    { id: "hub", label: "Habits + Health" },
+    { id: "social", label: "Social" },
+    { id: "todo", label: "To-Do List" },
+  ];
+  const currentNavLabel = allNavItems.find(p => p.id === route.page)?.label ?? "Menu";
+
   useEffect(() => {
-    if (!menuOpen && !dropOpen) return;
-    const onKey = (e) => { if (e.key === "Escape") { setMenuOpen(false); setDropOpen(null); } };
+    if (!menuOpen && !dropOpen && !mobileNavOpen) return;
+    const onKey = (e) => { if (e.key === "Escape") { setMenuOpen(false); setDropOpen(null); setMobileNavOpen(false); } };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [menuOpen, dropOpen]);
+  }, [menuOpen, dropOpen, mobileNavOpen]);
+
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const onClick = (e) => {
+      if (mobileNavRef.current && !mobileNavRef.current.contains(e.target)) {
+        setMobileNavOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [mobileNavOpen]);
 
   return (
     <header className="topbar">
@@ -225,6 +246,30 @@ export function TopBar({ route, setRoute, dateLabel, onHubTab }) {
             </text>
           </svg>
         </div>
+        {/* Mobile nav dropdown - visible only on small screens */}
+        <div className="mobile-nav" ref={mobileNavRef}>
+          <button
+            className={"mobile-nav-btn" + (mobileNavOpen ? " is-open" : "")}
+            onClick={() => setMobileNavOpen(o => !o)}
+          >
+            {currentNavLabel}
+            <Icon.Chevron />
+          </button>
+          {mobileNavOpen && (
+            <div className="mobile-nav-menu fade-in">
+              {allNavItems.map(it => (
+                <button
+                  key={it.id}
+                  className={"mobile-nav-item" + (route.page === it.id ? " is-active" : "")}
+                  onClick={() => { setRoute({ page: it.id }); setMobileNavOpen(false); }}
+                >
+                  {it.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <nav className="nav">
           {items.map((it) => {
             const isDropdown = it.dropdown;
