@@ -18,6 +18,8 @@ export function TodoList({ state, setState, actions }) {
   const [expandedDetails, setExpandedDetails] = useState({});
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [selectMode, setSelectMode] = useState(false);
+  const [mobileTab, setMobileTab] = useState("all");
+  const [mobileNewTitle, setMobileNewTitle] = useState("");
 
   const todos = state.todos;
   const filtered = useMemo(
@@ -28,6 +30,7 @@ export function TodoList({ state, setState, actions }) {
   const incomplete = filtered.filter((t) => !t.done);
   const doneToday = filtered.filter((t) => t.done && t.completedDay === "today");
   const doneWeek = filtered.filter((t) => t.done && t.completedDay !== "today");
+  const todayCount = incomplete.filter(t => t.due === 0).length;
 
   const sortedIncomplete = [...incomplete].sort((a, b) => {
     const aOver = a.due != null && a.due < 0;
@@ -36,6 +39,10 @@ export function TodoList({ state, setState, actions }) {
     if (!!a.priority !== !!b.priority) return a.priority ? -1 : 1;
     return 0;
   });
+
+  const mobileSorted = mobileTab === "today"
+    ? sortedIncomplete.filter(t => t.due === 0)
+    : sortedIncomplete;
 
   const update = (id, patch) => actions.updateTodo(id, patch);
   const toggleDone = (id) => actions.toggleDone(id);
@@ -95,9 +102,36 @@ export function TodoList({ state, setState, actions }) {
 
   const exitSelect = () => { setSelectedIds(new Set()); setSelectMode(false); };
 
+  const mobileAddTodo = () => {
+    if (!mobileNewTitle.trim()) return;
+    actions.addTodo({
+      id: Date.now(),
+      title: mobileNewTitle.trim(),
+      account: "getro",
+      done: false,
+      priority: false,
+      details: null,
+      due: null,
+      subtasks: [],
+    });
+    setMobileNewTitle("");
+  };
+
   return (
     <div className="page page--narrow fade-in">
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
+      {/* Mobile tabs — hidden on desktop via CSS */}
+      <div className="mob-tabs">
+        <button className={"mob-tab" + (mobileTab === "today" ? " is-active" : "")} onClick={() => setMobileTab("today")}>
+          Today
+          {todayCount > 0 && <span className="mob-tab-count">{todayCount}</span>}
+        </button>
+        <button className={"mob-tab" + (mobileTab === "all" ? " is-active" : "")} onClick={() => setMobileTab("all")}>
+          All tasks
+          {incomplete.length > 0 && <span className="mob-tab-count">{incomplete.length}</span>}
+        </button>
+      </div>
+
+      <div className="todo-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
         <span className="date-chip">
           <span className="cal-icon" />
           {fmtShort(TODAY)}
@@ -189,7 +223,7 @@ export function TodoList({ state, setState, actions }) {
           </label>
         )}
 
-        {sortedIncomplete.map((t) => (
+        {mobileSorted.map((t) => (
           <TodoRow key={t.id} t={t}
             expanded={!!expandedDetails[t.id]}
             onExpand={() => setExpandedDetails((s) => ({ ...s, [t.id]: !s[t.id] }))}
@@ -205,7 +239,7 @@ export function TodoList({ state, setState, actions }) {
           />
         ))}
 
-        {doneToday.length > 0 && sortedIncomplete.length > 0 && (
+        {doneToday.length > 0 && mobileSorted.length > 0 && (
           <div className="todo-divider" />
         )}
 
@@ -226,14 +260,14 @@ export function TodoList({ state, setState, actions }) {
           />
         ))}
 
-        {sortedIncomplete.length === 0 && doneToday.length === 0 && (
+        {mobileSorted.length === 0 && doneToday.length === 0 && (
           <div className="tiny" style={{ textAlign: "center", padding: "30px 16px", color: "var(--text-3)" }}>
             Nothing on the list. Type above to add the first task.
           </div>
         )}
       </div>
 
-      <div style={{ marginTop: 28 }}>
+      <div className="todo-week-section" style={{ marginTop: 28 }}>
         <button
           onClick={() => setShowWeek((s) => !s)}
           style={{
@@ -286,6 +320,21 @@ export function TodoList({ state, setState, actions }) {
           </div>
         </div>
       )}
+
+      {/* Mobile add task footer — hidden on desktop via CSS */}
+      <div className="mob-add-footer">
+        <form className="mob-add-row" onSubmit={e => { e.preventDefault(); mobileAddTodo(); }}>
+          <input
+            className="mob-add-input"
+            placeholder="Add a task..."
+            value={mobileNewTitle}
+            onChange={e => setMobileNewTitle(e.target.value)}
+          />
+          <button className="mob-add-btn" type="submit" disabled={!mobileNewTitle.trim()}>
+            <Icon.Plus />
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
