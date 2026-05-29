@@ -2219,7 +2219,8 @@ textarea.input.is-filled--green {
    Mobile (≤640px)
    ============================================================ */
 @media (max-width: 640px) {
-  /* Compact topbar */
+  /* Compact topbar — raised z-index so dropdown clears all page content */
+  .topbar { z-index: 200; }
   .topbar-inner {
     padding: 10px 16px;
     gap: 10px;
