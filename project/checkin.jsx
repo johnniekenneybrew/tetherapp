@@ -17,7 +17,7 @@ function DailyCheckIn({ state, setState, navigateTo }) {
   // Local working copies (persist back into state on change)
   const [priorities, setPriorities] = useState(state.checkin?.priorities || []);
   const [newPriority, setNewPriority] = useState("");
-  const [newAccount, setNewAccount] = useState("getro");
+  const [newAccount, setNewAccount] = useState("findem");
   const [gratitude, setGratitude] = useState(state.checkin?.gratitude || ["", "", ""]);
   const [learnings, setLearnings] = useState(state.checkin?.learnings || ["", "", ""]);
   const [sectionsDone, setSectionsDone] = useState(state.checkin?.sectionsDone || {

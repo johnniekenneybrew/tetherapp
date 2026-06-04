@@ -11,7 +11,7 @@ import { useAppData } from './useAppData';
 // App
 // ============================================================
 
-const DEFAULT_AREA_COLORS = { getro: "#3B82F6", jones: "#8B5CF6", personal: "#64748B" };
+const DEFAULT_AREA_COLORS = { findem: "#3B82F6", jones: "#8B5CF6", personal: "#64748B" };
 
 function AuthedApp() {
   const { state, setState, loading, error, actions } = useAppData();

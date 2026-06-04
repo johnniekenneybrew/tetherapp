@@ -16,7 +16,7 @@
   --text-3: #A0A0A0;
 
   /* Accents — accounts */
-  --acc-getro: #3B82F6;
+  --acc-findem: #3B82F6;
   --acc-jones: #8B5CF6;
   --acc-personal: #64748B;
 
@@ -324,7 +324,7 @@ h1.page-title {
 }
 .btn-text:hover { background: var(--surface-2); color: var(--text); }
 .btn-link {
-  color: var(--acc-getro);
+  color: var(--acc-findem);
   font-weight: 600;
   font-size: 13px;
   background: none;
@@ -360,7 +360,7 @@ h1.page-title {
 .cb--circle { border-radius: 50%; }
 
 /* Account-tinted check */
-.cb[data-acc="getro"].is-checked { background: var(--acc-getro); border-color: var(--acc-getro); }
+.cb[data-acc="findem"].is-checked { background: var(--acc-findem); border-color: var(--acc-findem); }
 .cb[data-acc="jones"].is-checked { background: var(--acc-jones); border-color: var(--acc-jones); }
 .cb[data-acc="personal"].is-checked { background: var(--acc-personal); border-color: var(--acc-personal); }
 
@@ -373,7 +373,7 @@ h1.page-title {
   display: inline-block;
   flex-shrink: 0;
 }
-.dot--getro { background: var(--acc-getro); }
+.dot--findem { background: var(--acc-findem); }
 .dot--jones { background: var(--acc-jones); }
 .dot--personal { background: var(--acc-personal); }
 .dot--lg { width: 10px; height: 10px; }

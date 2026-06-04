@@ -1,9 +1,9 @@
 // ── Config ───────────────────────────────────────────────────
 const BASE = '/api';
 const ACCTS = [
-  { id: 'getro',    name: 'Getro/Findem',    color: '#FF9500' },
-  { id: 'jones',    name: 'Jones',            color: '#10B981' },
-  { id: 'personal', name: 'Personal',         color: '#6366F1' },
+  { id: 'findem',   name: 'Findem',   color: '#3B82F6' },
+  { id: 'jones',    name: 'Jones',    color: '#8B5CF6' },
+  { id: 'personal', name: 'Personal', color: '#64748B' },
 ];
 const accColor = id => ACCTS.find(a => a.id === id)?.color || '#9CA3AF';
 const accName  = id => ACCTS.find(a => a.id === id)?.name  || id;
@@ -11,7 +11,7 @@ const accName  = id => ACCTS.find(a => a.id === id)?.name  || id;
 // ── State ────────────────────────────────────────────────────
 let tasks       = [];
 let taskCreationOrder = new Map(); // maps task.id to creation timestamp for sorting
-let filter      = 'all'; // 'all' | 'getro' | 'jones' | 'personal'
+let filter      = 'all'; // 'all' | 'findem' | 'jones' | 'personal'
 let showDone    = true;
 let filterOpen  = false;
 let loading     = true;

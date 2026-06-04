@@ -10,7 +10,7 @@ const HABITS = [
   { id: "h-meal", name: "Meal Prep", target: 4, account: "personal", goals: ["g-weight"] },
   { id: "h-cal",  name: "Track Calories", target: 7, account: "personal", goals: ["g-weight"] },
   { id: "h-read", name: "Read 20 min", target: 5, account: "personal", goals: ["g-read"] },
-  { id: "h-deep", name: "Deep Work Block", target: 5, account: "getro", goals: ["g-launch"] },
+  { id: "h-deep", name: "Deep Work Block", target: 5, account: "findem", goals: ["g-launch"] },
 ];
 
 const ROUTINES = [
@@ -29,7 +29,7 @@ const GOALS = [
   {
     id: "g-launch", name: "Ship Onboarding v2", description: "Defend deep-work mornings",
     status: "in-progress", habitIds: ["h-deep"], weekPct: 88, prevPct: 71,
-    target: "Jun 14, 2026", account: "getro",
+    target: "Jun 14, 2026", account: "findem",
   },
   {
     id: "g-read", name: "Read 12 books this year", description: "Quiet reading ritual",
@@ -43,14 +43,14 @@ const GOALS = [
 ];
 
 const TODOS = [
-  { id: 1, title: "Review Q2 onboarding metrics", account: "getro", done: false, priority: true,
+  { id: 1, title: "Review Q2 onboarding metrics", account: "findem", done: false, priority: true,
     details: "Pull conversion + activation curves. Compare to Q1 launch cohort.",
     due: 2, subtasks: [
       { id: 11, text: "Export funnel CSV", done: true },
       { id: 12, text: "Annotate week 4 dip", done: false },
       { id: 13, text: "Share read-out doc", done: false },
     ]},
-  { id: 2, title: "Client call with Jereme", account: "getro", done: false, priority: true,
+  { id: 2, title: "Client call with Jereme", account: "findem", done: false, priority: true,
     details: "Walk through onboarding redesign and the new lifecycle emails.",
     due: 0, subtasks: [] },
   { id: 3, title: "Process refund requests", account: "jones", done: false, priority: true,
@@ -65,13 +65,13 @@ const TODOS = [
     details: null, due: 8, subtasks: [] },
   { id: 6, title: "Renew gym membership", account: "personal", done: false, priority: false,
     details: null, due: null, subtasks: [] },
-  { id: 7, title: "Send follow-up to Jereme", account: "getro", done: true, priority: false,
+  { id: 7, title: "Send follow-up to Jereme", account: "findem", done: true, priority: false,
     completedDay: "today", completedAgo: "2 hours ago",
     details: null, due: null, subtasks: [] },
-  { id: 8, title: "Update Slack status", account: "getro", done: true, priority: false,
+  { id: 8, title: "Update Slack status", account: "findem", done: true, priority: false,
     completedDay: "today", completedAgo: "30 min ago",
     details: null, due: null, subtasks: [] },
-  { id: 9, title: "Draft Q2 board update", account: "getro", done: true, priority: false,
+  { id: 9, title: "Draft Q2 board update", account: "findem", done: true, priority: false,
     completedDay: "Mon, May 19", details: null, due: null, subtasks: [] },
   { id: 10, title: "Cancel Sentry trial", account: "jones", done: true, priority: false,
     completedDay: "Tue, May 20", details: null, due: null, subtasks: [] },

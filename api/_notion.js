@@ -22,7 +22,7 @@ export const DB = {
 
 // Account mapping: app id -> Notion select value
 export const ACC_MAP = {
-  getro:    "Getro",
+  findem:   "Findem",
   jones:    "Quit with Jones",
   personal: "Personal",
 };

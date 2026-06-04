@@ -915,7 +915,7 @@ function SettingsTab({ state, setState }) {
 
   const accounts = state.accounts || ACCOUNTS.map((a) => ({
     ...a,
-    color: a.id === "getro" ? "#3B82F6" : a.id === "jones" ? "#8B5CF6" : "#64748B",
+    color: a.id === "findem" ? "#3B82F6" : a.id === "jones" ? "#8B5CF6" : "#64748B",
     emails: a.emails || [a.email || ""],
   }));
 

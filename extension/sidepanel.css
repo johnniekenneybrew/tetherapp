@@ -200,6 +200,11 @@ html, body, #app {
   font-size: 9.5px; font-weight: 700; padding: 1px 5px; border-radius: 3px;
   letter-spacing: 0.04em;
 }
+.s-label-badge {
+  font-size: 9px; font-weight: 500; padding: 1px 5px; border-radius: 3px;
+  letter-spacing: 0.03em; text-transform: uppercase;
+  color: #6b7280; background: #f3f4f6;
+}
 
 /* 3-dot menu */
 .s-menu-wrap { position: relative; flex-shrink: 0; margin-top: -1px; }

@@ -297,6 +297,9 @@ function TaskCard({ t, onToggle, onDelete, onUpdate, onToggleSub, onAddSub, comp
 
           {t.priority && !t.done && <span className="tdx-flag">★</span>}
           {t.now && !t.done && <span className="tdx-now">now</span>}
+          {t.labels?.map(l => (
+            <span key={l} className="tdx-label">{l}</span>
+          ))}
           {dueLabel && (
             <span className={'tdx-due' + (overdue ? ' is-overdue' : '')}>{dueLabel}</span>
           )}
@@ -413,7 +416,7 @@ function FocusView({ todos, actions }) {
   const [choice, setChoice] = useState('25/5');
   const [, forceTick] = useState(0);
   const [newTitle, setNewTitle] = useState('');
-  const [newAccount, setNewAccount] = useState('getro');
+  const [newAccount, setNewAccount] = useState('findem');
   const notifiedRef = useRef(false);
 
   // persist on every change

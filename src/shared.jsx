@@ -16,9 +16,9 @@ export function showToast(msg = "Saved") { _toastHandler?.(msg); }
 // ============================================================
 
 export const ACCOUNTS = [
-  { id: "getro", short: "G", name: "Getro", emails: ["j@getro.com"] },
-  { id: "jones", short: "Q", name: "Quit with Jones", emails: ["j@quitwithjones.com"] },
-  { id: "personal", short: "P", name: "Personal", emails: ["j@me.com", "jordan.m@gmail.com"] },
+  { id: "findem",   short: "F", name: "Findem",         emails: ["j@getro.com"] },
+  { id: "jones",    short: "Q", name: "Quit with Jones", emails: ["j@quitwithjones.com"] },
+  { id: "personal", short: "P", name: "Personal",        emails: ["j@me.com", "jordan.m@gmail.com"] },
 ];
 export const accLookup = Object.fromEntries(ACCOUNTS.map((a) => [a.id, a]));
 

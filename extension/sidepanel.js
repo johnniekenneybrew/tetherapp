@@ -1,9 +1,9 @@
 // ── Config ───────────────────────────────────────────────────
 const BASE = 'https://to-tether.app/api';
 const ACCTS = [
-  { id: 'getro',    name: 'Getro',           color: '#3B82F6' },
-  { id: 'jones',    name: 'Quit with Jones',  color: '#8B5CF6' },
-  { id: 'personal', name: 'Personal',         color: '#64748B' },
+  { id: 'findem',   name: 'Findem',          color: '#3B82F6' },
+  { id: 'jones',    name: 'Quit with Jones', color: '#8B5CF6' },
+  { id: 'personal', name: 'Personal',        color: '#64748B' },
 ];
 const accColor = id => ACCTS.find(a => a.id === id)?.color || '#9CA3AF';
 const accName  = id => ACCTS.find(a => a.id === id)?.name  || id;
@@ -272,6 +272,7 @@ function makeTaskEl(task) {
           <span class="s-task-title" contenteditable="plaintext-only" data-title-tid="${task.id}" spellcheck="false">${escHtml(task.title)}</span>
           <span class="s-acc-dot" style="background:${color}"></span>
           ${task.priority && !task.done ? `<span class="s-prio-badge" style="color:${color};background:${color}18">PRIORITY</span>` : ''}
+          ${(task.labels || []).map(l => `<span class="s-label-badge">${escHtml(l)}</span>`).join('')}
         </div>
         ${dl && !task.done ? `<div style="margin-top:3px">
           <span style="font-size:11px;font-weight:500;color:${task.due < 0 ? 'var(--error)' : task.due === 0 ? 'var(--brand)' : 'var(--text-3)'}">

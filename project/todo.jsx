@@ -6,11 +6,11 @@
 // ============================================================
 
 function TodoList({ state, setState }) {
-  const [filter, setFilter] = useState("all"); // all|getro|jones|personal
+  const [filter, setFilter] = useState("all"); // all|findem|jones|personal
   const [showWeek, setShowWeek] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newOpen, setNewOpen] = useState(false);
-  const [newAccount, setNewAccount] = useState("getro");
+  const [newAccount, setNewAccount] = useState("findem");
   const [newDetails, setNewDetails] = useState("");
   const [expandedDetails, setExpandedDetails] = useState({});
 
