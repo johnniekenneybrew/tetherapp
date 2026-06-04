@@ -6,7 +6,7 @@ const { useState, useEffect, useRef, useMemo, useCallback } = React;
 // ============================================================
 
 const ACCOUNTS = [
-  { id: "getro", short: "G", name: "Getro", emails: ["j@getro.com"] },
+  { id: "findem", short: "F", name: "Findem", emails: ["j@getro.com"] },
   { id: "jones", short: "Q", name: "Quit with Jones", emails: ["j@quitwithjones.com"] },
   { id: "personal", short: "P", name: "Personal", emails: ["j@me.com", "jordan.m@gmail.com"] },
 ];

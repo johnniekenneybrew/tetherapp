@@ -2,29 +2,48 @@ import { setCors } from "./_notion.js";
 import {
   listTasks, listCompletedTasks, getTask,
   createTask, updateTask, closeTask, reopenTask, deleteTask,
-  listLabels, createLabel,
+  listProjects, createProject,
 } from "./_todoist.js";
 
-// Ensure account labels exist in Todoist (runs once per cold start)
-let labelsEnsured = false;
-async function ensureAccountLabels() {
-  if (labelsEnsured) return;
-  const raw = await listLabels();
+// Account → Todoist project mapping
+const ACCOUNT_PROJECTS = [
+  { id: "findem",   name: "Findem"   },
+  { id: "jones",    name: "Jones"    },
+  { id: "personal", name: "Personal" },
+];
+const ACCOUNT_IDS = new Set(ACCOUNT_PROJECTS.map(p => p.id));
+
+// Project cache (populated on first request per cold start)
+let projectsEnsured = false;
+let accToProjectId  = {};  // { findem: "123", jones: "456", personal: "789" }
+let projectIdToAcc  = {};  // { "123": "findem", ... }
+
+async function ensureProjects() {
+  if (projectsEnsured) return;
+  const raw = await listProjects();
   const existing = Array.isArray(raw) ? raw : (raw?.results || raw?.items || []);
-  const existingNames = new Set(existing.map(l => l.name));
-  await Promise.all(
-    ACCOUNT_LABELS
-      .filter(name => !existingNames.has(name))
-      .map(name => createLabel(name))
-  );
-  labelsEnsured = true;
+
+  const byName = {};
+  for (const p of existing) byName[p.name.toLowerCase()] = p.id;
+
+  for (const { id: accId, name } of ACCOUNT_PROJECTS) {
+    let projId = byName[name.toLowerCase()];
+    if (!projId) {
+      const created = await createProject(name);
+      projId = created.id;
+    }
+    accToProjectId[accId] = projId;
+    projectIdToAcc[projId] = accId;
+  }
+
+  projectsEnsured = true;
 }
 
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
 const TODAY_MS  = new Date(TODAY_ISO + "T00:00:00").getTime();
 
-// These label names must match the account IDs in the frontend (getro, jones, personal)
-const ACCOUNT_LABELS = ["getro", "jones", "personal"];
+// Special labels handled as booleans in the Tether model
+const SPECIAL_LABELS = new Set(["parked", "now"]);
 
 function isoToDue(iso) {
   if (!iso) return null;
@@ -55,8 +74,8 @@ function toTodoistPriority(tetherPriority) {
   return tetherPriority ? 4 : 1;
 }
 
-function accountFromLabels(labels = []) {
-  return labels.find(l => ACCOUNT_LABELS.includes(l)) || "personal";
+function accountFromProjectId(projectId) {
+  return projectIdToAcc[projectId] || "personal";
 }
 
 function isParked(labels = []) {
@@ -67,12 +86,17 @@ function isNow(labels = []) {
   return labels.includes("now");
 }
 
+// Non-special labels (Internal, Design, Call Follow Ups, Onboarding, etc.)
+function getTaskLabels(labels = []) {
+  return labels.filter(l => !SPECIAL_LABELS.has(l));
+}
+
 function toTask(t, subtasksMap = {}) {
   const completedAt = t.completed_at || t.completedAt || null;
   return {
     id:           t.id,
     title:        t.content,
-    account:      accountFromLabels(t.labels),
+    account:      accountFromProjectId(t.project_id),
     parked:       isParked(t.labels),
     now:          isNow(t.labels),
     done:         !!(t.is_completed || completedAt),
@@ -81,6 +105,7 @@ function toTask(t, subtasksMap = {}) {
     due:          isoToDue(t.due?.date || null),
     completedDay: completedAt ? completedDayLabel(completedAt) : null,
     completedAgo: null,
+    labels:       getTaskLabels(t.labels || []),
     subtasks:     subtasksMap[t.id] || [],
     _parentId:    t.parent_id || null,
   };
@@ -91,20 +116,17 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
 
   try {
-    await ensureAccountLabels();
+    await ensureProjects();
 
     // ── GET ──────────────────────────────────────────────────
     if (req.method === "GET") {
-      // Active tasks
       const activeRaw = await listTasks();
       const active = Array.isArray(activeRaw) ? activeRaw : (activeRaw?.results || activeRaw?.items || []);
 
-      // Recently completed tasks (last 7 days) for "completed this week" display
       let completed = [];
       try {
         const since = new Date(TODAY_MS - 6 * 86400000).toISOString();
         const result = await listCompletedTasks({ since });
-        // v1 may return { items: [...] } or an array directly
         completed = Array.isArray(result) ? result : (result?.items || []);
       } catch {
         // endpoint may require premium — silently skip
@@ -112,7 +134,6 @@ export default async function handler(req, res) {
 
       const all = [...active, ...completed];
 
-      // Build subtask map: parentId → [{ id, text, done }]
       const subtasksMap = {};
       for (const t of all) {
         if (t.parent_id) {
@@ -125,7 +146,6 @@ export default async function handler(req, res) {
         }
       }
 
-      // Top-level tasks only
       const tasks = all
         .filter(t => !t.parent_id)
         .map(t => { const mapped = toTask(t, subtasksMap); delete mapped._parentId; return mapped; });
@@ -135,15 +155,19 @@ export default async function handler(req, res) {
 
     // ── POST (create) ─────────────────────────────────────────
     if (req.method === "POST") {
-      const { title, account, done, priority, details, due, parentId, parked, now } = req.body;
+      const { title, account, done, priority, details, due, parentId, parked, now, labels } = req.body;
 
-      const labels = ACCOUNT_LABELS.includes(account) ? [account] : ["personal"];
-      if (parked) labels.push("parked");
-      if (now) labels.push("now");
+      const acc = ACCOUNT_IDS.has(account) ? account : "personal";
+      const taskLabels = [];
+      if (parked) taskLabels.push("parked");
+      if (now)    taskLabels.push("now");
+      if (Array.isArray(labels)) taskLabels.push(...labels.filter(l => !SPECIAL_LABELS.has(l)));
+
       const payload = {
         content:     title,
         description: details || "",
-        labels,
+        project_id:  accToProjectId[acc],
+        labels:      taskLabels,
         priority:    toTodoistPriority(priority),
       };
       if (due != null) payload.due_date = dueToIso(due);
@@ -168,19 +192,30 @@ export default async function handler(req, res) {
       if (patch.priority !== undefined) updates.priority    = toTodoistPriority(patch.priority);
       if (patch.due      !== undefined) updates.due_date    = dueToIso(patch.due);
 
-      // Handle account, parked, and now labels together
-      if (patch.account !== undefined || patch.parked !== undefined || patch.now !== undefined) {
+      // Account change → move to different project
+      if (patch.account !== undefined) {
+        const acc = ACCOUNT_IDS.has(patch.account) ? patch.account : "personal";
+        updates.project_id = accToProjectId[acc];
+      }
+
+      // Label changes (parked, now, user-defined labels)
+      if (patch.parked !== undefined || patch.now !== undefined || patch.labels !== undefined) {
         let existing = null;
-        if (patch.account === undefined || patch.parked === undefined || patch.now === undefined) {
-          try { existing = await getTask(id); } catch { /* task not fetchable */ }
+        const needsExisting = patch.parked === undefined || patch.now === undefined || patch.labels === undefined;
+        if (needsExisting) {
+          try { existing = await getTask(id); } catch {}
         }
-        const account = patch.account !== undefined ? patch.account : accountFromLabels(existing?.labels || []);
-        const parked = patch.parked !== undefined ? patch.parked : isParked(existing?.labels || []);
-        const now = patch.now !== undefined ? patch.now : isNow(existing?.labels || []);
-        const labels = ACCOUNT_LABELS.includes(account) ? [account] : ["personal"];
-        if (parked) labels.push("parked");
-        if (now) labels.push("now");
-        updates.labels = labels;
+        const parked     = patch.parked  !== undefined ? patch.parked  : isParked(existing?.labels || []);
+        const now        = patch.now     !== undefined ? patch.now     : isNow(existing?.labels || []);
+        const userLabels = patch.labels  !== undefined
+          ? patch.labels.filter(l => !SPECIAL_LABELS.has(l))
+          : getTaskLabels(existing?.labels || []);
+
+        const newLabels = [];
+        if (parked) newLabels.push("parked");
+        if (now)    newLabels.push("now");
+        newLabels.push(...userLabels);
+        updates.labels = newLabels;
       }
 
       if (Object.keys(updates).length > 0) await updateTask(id, updates);
@@ -189,15 +224,14 @@ export default async function handler(req, res) {
       if (patch.done === true)  await closeTask(id);
       if (patch.done === false) await reopenTask(id);
 
-      // Return updated shape (getTask fails for closed tasks, so reconstruct)
       let fresh = null;
       if (patch.done !== true) {
-        try { fresh = await getTask(id); } catch { /* closed tasks not fetchable */ }
+        try { fresh = await getTask(id); } catch {}
       }
 
       const result = fresh
         ? toTask(fresh)
-        : { id, ...patch, completedDay: patch.done ? "today" : null };
+        : { id, ...patch, labels: patch.labels || [], completedDay: patch.done ? "today" : null };
       delete result._parentId;
       return res.json(result);
     }

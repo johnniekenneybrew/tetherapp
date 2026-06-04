@@ -51,3 +51,8 @@ export const deleteTask = (id) => td("DELETE", `/tasks/${id}`);
 export const listLabels = () => td("GET", "/labels");
 
 export const createLabel = (name) => td("POST", "/labels", { name });
+
+// Projects
+export const listProjects = () => td("GET", "/projects");
+
+export const createProject = (name) => td("POST", "/projects", { name });

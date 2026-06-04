@@ -25,7 +25,7 @@ export function DailyCheckIn({ state, setState, navigateTo, actions }) {
 
   const priorities = (state.todos || []).filter(t => t.priority && t.due === 0);
   const [newPriority, setNewPriority] = useState("");
-  const [newAccount, setNewAccount] = useState("getro");
+  const [newAccount, setNewAccount] = useState("findem");
   const [gratitude, setGratitude] = useState(state.checkin?.gratitude || ["", "", ""]);
   const [learnings, setLearnings] = useState(state.checkin?.learnings || ["", "", ""]);
   const [sectionsDone, setSectionsDone] = useState(state.checkin?.sectionsDone || {

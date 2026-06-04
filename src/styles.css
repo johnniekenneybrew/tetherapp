@@ -16,7 +16,7 @@
   --text-3: #A0A0A0;
 
   /* Accents — accounts */
-  --acc-getro: #3B82F6;
+  --acc-findem: #3B82F6;
   --acc-jones: #8B5CF6;
   --acc-personal: #64748B;
 
@@ -327,7 +327,7 @@ h1.page-title {
 }
 .btn-text:hover { background: var(--surface-2); color: var(--text); }
 .btn-link {
-  color: var(--acc-getro);
+  color: var(--acc-findem);
   font-weight: 600;
   font-size: 13px;
   background: none;
@@ -363,7 +363,7 @@ h1.page-title {
 .cb--circle { border-radius: 50%; }
 
 /* Account-tinted check */
-.cb[data-acc="getro"].is-checked { background: var(--acc-getro); border-color: var(--acc-getro); }
+.cb[data-acc="findem"].is-checked { background: var(--acc-findem); border-color: var(--acc-findem); }
 .cb[data-acc="jones"].is-checked { background: var(--acc-jones); border-color: var(--acc-jones); }
 .cb[data-acc="personal"].is-checked { background: var(--acc-personal); border-color: var(--acc-personal); }
 
@@ -376,7 +376,7 @@ h1.page-title {
   display: inline-block;
   flex-shrink: 0;
 }
-.dot--getro { background: var(--acc-getro); }
+.dot--findem { background: var(--acc-findem); }
 .dot--jones { background: var(--acc-jones); }
 .dot--personal { background: var(--acc-personal); }
 .dot--lg { width: 10px; height: 10px; }
@@ -898,7 +898,7 @@ textarea.input.is-filled--green {
 .tdx-check.is-checked > svg { opacity: 1; }
 .tdx-check:hover { border-color: var(--text-3); }
 .tdx-check.is-checked { border: none; }
-.tdx-check[data-acc="getro"].is-checked { background: var(--acc-getro); }
+.tdx-check[data-acc="findem"].is-checked { background: var(--acc-findem); }
 .tdx-check[data-acc="jones"].is-checked { background: var(--acc-jones); }
 .tdx-check[data-acc="personal"].is-checked { background: var(--acc-personal); }
 .tdx-check-sm { width: 16px; height: 16px; }
@@ -916,6 +916,11 @@ textarea.input.is-filled--green {
   flex-shrink: 0; font-size: 9.5px; font-weight: 700; text-transform: uppercase;
   letter-spacing: .03em; color: var(--tdx-brand);
   background: rgba(108,99,255,0.1); border-radius: 4px; padding: 1px 5px;
+}
+.tdx-label {
+  flex-shrink: 0; font-size: 9.5px; font-weight: 500; text-transform: uppercase;
+  letter-spacing: .03em; color: var(--text-2);
+  background: var(--surface-2); border-radius: 4px; padding: 1px 5px;
 }
 .tdx-due {
   flex-shrink: 0; font-size: 11px; font-weight: 500; color: var(--text-2);
