@@ -63,6 +63,10 @@ function isParked(labels = []) {
   return labels.includes("parked");
 }
 
+function isNow(labels = []) {
+  return labels.includes("now");
+}
+
 function toTask(t, subtasksMap = {}) {
   const completedAt = t.completed_at || t.completedAt || null;
   return {
@@ -70,6 +74,7 @@ function toTask(t, subtasksMap = {}) {
     title:        t.content,
     account:      accountFromLabels(t.labels),
     parked:       isParked(t.labels),
+    now:          isNow(t.labels),
     done:         !!(t.is_completed || completedAt),
     priority:     toTetherPriority(t.priority),
     details:      t.description || null,
@@ -130,10 +135,11 @@ export default async function handler(req, res) {
 
     // ── POST (create) ─────────────────────────────────────────
     if (req.method === "POST") {
-      const { title, account, done, priority, details, due, parentId, parked } = req.body;
+      const { title, account, done, priority, details, due, parentId, parked, now } = req.body;
 
       const labels = ACCOUNT_LABELS.includes(account) ? [account] : ["personal"];
       if (parked) labels.push("parked");
+      if (now) labels.push("now");
       const payload = {
         content:     title,
         description: details || "",
@@ -162,16 +168,18 @@ export default async function handler(req, res) {
       if (patch.priority !== undefined) updates.priority    = toTodoistPriority(patch.priority);
       if (patch.due      !== undefined) updates.due_date    = dueToIso(patch.due);
 
-      // Handle account and parked labels together
-      if (patch.account !== undefined || patch.parked !== undefined) {
+      // Handle account, parked, and now labels together
+      if (patch.account !== undefined || patch.parked !== undefined || patch.now !== undefined) {
         let existing = null;
-        if (patch.account === undefined || patch.parked === undefined) {
+        if (patch.account === undefined || patch.parked === undefined || patch.now === undefined) {
           try { existing = await getTask(id); } catch { /* task not fetchable */ }
         }
         const account = patch.account !== undefined ? patch.account : accountFromLabels(existing?.labels || []);
         const parked = patch.parked !== undefined ? patch.parked : isParked(existing?.labels || []);
+        const now = patch.now !== undefined ? patch.now : isNow(existing?.labels || []);
         const labels = ACCOUNT_LABELS.includes(account) ? [account] : ["personal"];
         if (parked) labels.push("parked");
+        if (now) labels.push("now");
         updates.labels = labels;
       }
 
