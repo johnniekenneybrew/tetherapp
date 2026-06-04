@@ -1,366 +1,241 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
-  ACCOUNTS, TODAY, fmtShort, fmtMD, addDays,
-  Checkbox, AccountDot, Icon,
+  ACCOUNTS, TODAY, fmtMD, addDays,
+  AccountDot, Icon,
 } from './shared';
 
 // ============================================================
-// To-Do List
+// To-Do List — column-by-area board with full parity to the
+// Chrome extension sidebar (Focus mode, parking, now tags, pills).
 // ============================================================
 
-export function TodoList({ state, setState, actions }) {
-  const [filter, setFilter] = useState("all");
-  const [showWeek, setShowWeek] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
-  const [newOpen, setNewOpen] = useState(false);
-  const [newAccount, setNewAccount] = useState("getro");
-  const [newDetails, setNewDetails] = useState("");
-  const [expandedDetails, setExpandedDetails] = useState({});
-  const [selectedIds, setSelectedIds] = useState(new Set());
-  const [selectMode, setSelectMode] = useState(false);
-  const [mobileTab, setMobileTab] = useState("all");
-  const [mobileNewTitle, setMobileNewTitle] = useState("");
+const VIEWS = [
+  { id: 'focus',   label: 'Focus' },
+  { id: 'active',  label: 'Active' },
+  { id: 'today',   label: 'Today' },
+  { id: 'week',    label: 'Week' },
+  { id: 'parking', label: 'Parking' },
+];
 
+// ---- Focus timer persistence (survives navigation / reload) ----
+const FOCUS_KEY = 'tether_focus_timer';
+const loadTimer = () => { try { return JSON.parse(localStorage.getItem(FOCUS_KEY)) || null; } catch { return null; } };
+const saveTimer = (t) => { try { t ? localStorage.setItem(FOCUS_KEY, JSON.stringify(t)) : localStorage.removeItem(FOCUS_KEY); } catch {} };
+
+const fmtTime = (secs) => {
+  const s = Math.max(0, Math.round(secs));
+  const m = Math.floor(s / 60);
+  return `${m}:${String(s % 60).padStart(2, '0')}`;
+};
+
+const remainingSeconds = (t) => {
+  if (!t || !t.active) return 0;
+  if (t.paused) return t.pausedRemaining;
+  return Math.max(0, Math.round((t.endsAt - Date.now()) / 1000));
+};
+
+const DURATIONS = [
+  { id: '25/5',  work: 25, brk: 5,  label: '25 / 5'  },
+  { id: '50/10', work: 50, brk: 10, label: '50 / 10' },
+];
+
+// ============================================================
+// Main board
+// ============================================================
+export function TodoList({ state, actions }) {
+  const [view, setView] = useState('active');
   const todos = state.todos;
-  const filtered = useMemo(
-    () => todos.filter((t) => filter === "all" || t.account === filter),
-    [todos, filter]
-  );
 
-  const incomplete = filtered.filter((t) => !t.done);
-  const doneToday = filtered.filter((t) => t.done && t.completedDay === "today");
-  const doneWeek = filtered.filter((t) => t.done && t.completedDay !== "today");
-  const todayCount = incomplete.filter(t => t.due === 0).length;
+  const update      = (id, patch) => actions.updateTodo(id, patch);
+  const toggleDone  = (id) => actions.toggleDone(id);
+  const delTodo     = (id) => actions.deleteTodo(id);
+  const addSubtask  = (id, text) => actions.addSubtask(id, text);
+  const toggleSub   = (todoId, subId) => actions.toggleSubtask(todoId, subId);
 
-  const sortedIncomplete = [...incomplete].sort((a, b) => {
-    const aOver = a.due != null && a.due < 0;
-    const bOver = b.due != null && b.due < 0;
-    if (aOver !== bOver) return aOver ? -1 : 1;
-    if (!!a.priority !== !!b.priority) return a.priority ? -1 : 1;
-    return 0;
-  });
-
-  const mobileSorted = mobileTab === "today"
-    ? sortedIncomplete.filter(t => t.due === 0)
-    : sortedIncomplete;
-
-  const update = (id, patch) => actions.updateTodo(id, patch);
-  const toggleDone = (id) => actions.toggleDone(id);
-  const delTodo = (id) => actions.deleteTodo(id);
-
-  const addTodo = () => {
-    if (!newTitle.trim()) return;
-    const next = {
-      id: Date.now(),
-      title: newTitle.trim(),
-      account: newAccount,
-      done: false,
-      priority: false,
-      details: newDetails.trim() || null,
-      due: null,
-      subtasks: [],
-    };
-    actions.addTodo(next);
-    setNewTitle(""); setNewDetails(""); setNewOpen(false);
-  };
-
-  const addSubtask = (id, text) => actions.addSubtask(id, text);
-  const toggleSub = (todoId, subId) => actions.toggleSubtask(todoId, subId);
-
-  const toggleSelect = (id) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const visibleIds = [...sortedIncomplete, ...doneToday].map(t => t.id);
-  const allSelected = selectMode && visibleIds.length > 0 && visibleIds.every(id => selectedIds.has(id));
-
-  const toggleSelectAll = () => {
-    if (allSelected) {
-      setSelectedIds(prev => { const n = new Set(prev); visibleIds.forEach(id => n.delete(id)); return n; });
-    } else {
-      setSelectedIds(prev => { const n = new Set(prev); visibleIds.forEach(id => n.add(id)); return n; });
-    }
-  };
-
-  const bulkMarkDone = () => {
-    [...selectedIds].forEach(id => {
-      const t = todos.find(t => t.id === id);
-      if (t && !t.done) actions.toggleDone(id);
-    });
-    exitSelect();
-  };
-
-  const bulkDelete = () => {
-    [...selectedIds].forEach(id => actions.deleteTodo(id));
-    exitSelect();
-  };
-
-  const exitSelect = () => { setSelectedIds(new Set()); setSelectMode(false); };
-
-  const mobileAddTodo = () => {
-    if (!mobileNewTitle.trim()) return;
-    actions.addTodo({
-      id: Date.now(),
-      title: mobileNewTitle.trim(),
-      account: "getro",
-      done: false,
-      priority: false,
-      details: null,
-      due: null,
-      subtasks: [],
-    });
-    setMobileNewTitle("");
-  };
+  const focusCount = todos.filter((t) => t.now && !t.done).length;
+  const parkedCount = todos.filter((t) => t.parked && !t.done).length;
 
   return (
-    <div className="page page--narrow fade-in">
-      {/* Mobile tabs — hidden on desktop via CSS */}
-      <div className="mob-tabs">
-        <button className={"mob-tab" + (mobileTab === "today" ? " is-active" : "")} onClick={() => setMobileTab("today")}>
-          Today
-          {todayCount > 0 && <span className="mob-tab-count">{todayCount}</span>}
-        </button>
-        <button className={"mob-tab" + (mobileTab === "all" ? " is-active" : "")} onClick={() => setMobileTab("all")}>
-          All tasks
-          {incomplete.length > 0 && <span className="mob-tab-count">{incomplete.length}</span>}
-        </button>
-      </div>
-
-      <div className="todo-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-        <span className="date-chip">
-          <span className="cal-icon" />
-          {fmtShort(TODAY)}
-        </span>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div className="filter-row">
+    <div className="page tdx-page fade-in">
+      <div className="tdx-tabs">
+        {VIEWS.map((v) => {
+          const badge = v.id === 'focus' ? focusCount : v.id === 'parking' ? parkedCount : 0;
+          return (
             <button
-              className={"filter-btn" + (filter === "all" ? " is-active" : "")}
-              onClick={() => setFilter("all")}>
-              All
+              key={v.id}
+              className={'tdx-tab' + (view === v.id ? ' is-on' : '') + (v.id === 'focus' ? ' is-focus' : '')}
+              onClick={() => setView(v.id)}>
+              {v.id === 'focus' && <Icon.Clock />}
+              {v.label}
+              {badge > 0 && <span className="tdx-tab-badge">{badge}</span>}
             </button>
-            {ACCOUNTS.map((a) => (
-              <button key={a.id}
-                className={"filter-btn filter-btn--dot" + (filter === a.id ? " is-active" : "")}
-                onClick={() => setFilter(a.id)}
-                title={a.name}>
-                <AccountDot acc={a.id} />
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={() => selectMode ? exitSelect() : setSelectMode(true)}
-            style={{
-              fontSize: 12.5, fontWeight: 500, padding: "4px 10px", borderRadius: 6,
-              border: "1px solid var(--border)", background: selectMode ? "var(--accent)" : "transparent",
-              color: selectMode ? "#fff" : "var(--text-3)", cursor: "pointer",
-            }}>
-            {selectMode ? "Cancel" : "Select"}
-          </button>
-        </div>
+          );
+        })}
       </div>
 
-      <div className="todo-list">
-        {/* Add row */}
-        <div className={"todo todo-add" + (newOpen ? " is-open" : "")}>
-          <button className="todo-add-plus" onClick={() => setNewOpen(true)}>
-            <Icon.Plus />
-          </button>
-          <div className="todo-main">
-            <input
-              className="todo-add-input"
-              placeholder="Add a task…"
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              onFocus={() => setNewOpen(true)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") addTodo();
-                if (e.key === "Escape") { setNewTitle(""); setNewDetails(""); setNewOpen(false); }
-              }}
+      {view === 'focus' ? (
+        <FocusView todos={todos} actions={actions} />
+      ) : (
+        <div className="tdx-board">
+          {ACCOUNTS.map((acc) => (
+            <BoardColumn
+              key={acc.id}
+              acc={acc}
+              view={view}
+              todos={todos}
+              actions={actions}
+              update={update}
+              toggleDone={toggleDone}
+              delTodo={delTodo}
+              addSubtask={addSubtask}
+              toggleSub={toggleSub}
             />
-            {newOpen && (
-              <div className="todo-add-expand fade-in">
-                <input
-                  className="todo-add-details"
-                  placeholder="Add details (optional)"
-                  value={newDetails}
-                  onChange={(e) => setNewDetails(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") addTodo(); }}
-                />
-                <div className="todo-add-controls">
-                  <span className="tiny">Account</span>
-                  {ACCOUNTS.map((a) => (
-                    <button key={a.id}
-                      className={"acc-chip" + (newAccount === a.id ? " is-on" : "")}
-                      onClick={() => setNewAccount(a.id)}
-                      title={a.name}>
-                      <AccountDot acc={a.id} />
-                      <span>{a.short}</span>
-                    </button>
-                  ))}
-                  <div className="spacer" />
-                  <button className="btn-text" onClick={() => { setNewTitle(""); setNewDetails(""); setNewOpen(false); }}>
-                    Cancel
-                  </button>
-                  <button className="btn btn-primary" onClick={addTodo} disabled={!newTitle.trim()}>
-                    Add task
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {selectMode && visibleIds.length > 0 && (
-          <label style={{ display: "flex", alignItems: "center", gap: 7, padding: "2px 4px", cursor: "pointer" }}>
-            <input type="checkbox" checked={allSelected} onChange={toggleSelectAll}
-              style={{ width: 15, height: 15, accentColor: "var(--accent)", cursor: "pointer" }} />
-            <span style={{ fontSize: 12.5, color: "var(--text-3)" }}>Select all</span>
-          </label>
-        )}
-
-        {mobileSorted.map((t) => (
-          <TodoRow key={t.id} t={t}
-            expanded={!!expandedDetails[t.id]}
-            onExpand={() => setExpandedDetails((s) => ({ ...s, [t.id]: !s[t.id] }))}
-            onToggle={() => toggleDone(t.id)}
-            onTogglePriority={() => update(t.id, { priority: !t.priority })}
-            onDelete={() => delTodo(t.id)}
-            onUpdate={(patch) => update(t.id, patch)}
-            onToggleSub={(sid) => toggleSub(t.id, sid)}
-            onAddSub={(txt) => addSubtask(t.id, txt)}
-            selectMode={selectMode}
-            selected={selectedIds.has(t.id)}
-            onSelect={() => toggleSelect(t.id)}
-          />
-        ))}
-
-        {doneToday.length > 0 && mobileSorted.length > 0 && (
-          <div className="todo-divider" />
-        )}
-
-        {doneToday.map((t) => (
-          <TodoRow key={t.id} t={t}
-            expanded={false}
-            onToggle={() => toggleDone(t.id)}
-            onTogglePriority={() => update(t.id, { priority: !t.priority })}
-            onDelete={() => delTodo(t.id)}
-            onUpdate={(patch) => update(t.id, patch)}
-            onExpand={() => {}}
-            onToggleSub={(sid) => toggleSub(t.id, sid)}
-            onAddSub={() => {}}
-            showCompletedAgo
-            selectMode={selectMode}
-            selected={selectedIds.has(t.id)}
-            onSelect={() => toggleSelect(t.id)}
-          />
-        ))}
-
-        {mobileSorted.length === 0 && doneToday.length === 0 && (
-          <div className="tiny" style={{ textAlign: "center", padding: "30px 16px", color: "var(--text-3)" }}>
-            Nothing on the list. Type above to add the first task.
-          </div>
-        )}
-      </div>
-
-      <div className="todo-week-section" style={{ marginTop: 28 }}>
-        <button
-          onClick={() => setShowWeek((s) => !s)}
-          style={{
-            display: "flex", alignItems: "center", gap: 8, fontSize: 13.5,
-            color: "var(--text-2)", fontWeight: 500, padding: "8px 0",
-          }}>
-          <Icon.Chevron style={{ transform: showWeek ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 150ms" }} />
-          Completed this week · {doneWeek.length}
-        </button>
-        {showWeek && (
-          <div className="todo-list fade-in">
-            {doneWeek.map((t) => (
-              <div key={t.id} className="todo is-done">
-                <Checkbox checked accent={t.account} onChange={() => toggleDone(t.id)} circle size="sm" />
-                <div className="todo-main">
-                  <div className="todo-title-row">
-                    <span className="todo-title">{t.title}</span>
-                    <AccountDot acc={t.account} />
-                  </div>
-                  <div className="todo-meta">
-                    <span>{t.completedDay}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {doneWeek.length === 0 && (
-              <div className="tiny" style={{ padding: 12 }}>Nothing archived yet.</div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Bulk action bar */}
-      {selectedIds.size > 0 && (
-        <div className="bulk-bar">
-          <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-2)" }}>
-            {selectedIds.size} selected
-          </span>
-          <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
-            <button className="btn btn-primary" style={{ fontSize: 12.5 }} onClick={bulkMarkDone}>
-              Mark done
-            </button>
-            <button className="btn" style={{ fontSize: 12.5, color: "var(--error)", borderColor: "var(--error)" }}
-              onClick={bulkDelete}>
-              Delete
-            </button>
-            <button className="btn-text" style={{ fontSize: 12.5, color: "var(--text-3)" }} onClick={exitSelect}>
-              Cancel
-            </button>
-          </div>
+          ))}
         </div>
       )}
-
-      {/* Mobile add task footer — hidden on desktop via CSS */}
-      <div className="mob-add-footer">
-        <form className="mob-add-row" onSubmit={e => { e.preventDefault(); mobileAddTodo(); }}>
-          <input
-            className="mob-add-input"
-            placeholder="Add a task..."
-            value={mobileNewTitle}
-            onChange={e => setMobileNewTitle(e.target.value)}
-          />
-          <button className="mob-add-btn" type="submit" disabled={!mobileNewTitle.trim()}>
-            <Icon.Plus />
-          </button>
-        </form>
-      </div>
     </div>
   );
 }
 
-function TodoRow({ t, expanded, onExpand, onToggle, onTogglePriority, onDelete, onUpdate, onToggleSub, onAddSub, showCompletedAgo, selectMode, selected, onSelect }) {
-  const [subText, setSubText] = useState("");
-  const [menuOpen, setMenuOpen] = useState(false);
+// ============================================================
+// A single area column
+// ============================================================
+function BoardColumn({ acc, view, todos, actions, update, toggleDone, delTodo, addSubtask, toggleSub }) {
+  const [newTitle, setNewTitle] = useState('');
+
+  const areaTodos = useMemo(
+    () => todos.filter((t) => t.account === acc.id),
+    [todos, acc.id]
+  );
+
+  const isToday = (t) => t.due === 0 || (t.due != null && t.due < 0);
+  const isThisWeek = (t) => t.due != null && t.due >= 0 && t.due <= 7;
+
+  let incomplete = areaTodos.filter((t) => !t.done && !t.parked);
+  if (view === 'today')   incomplete = incomplete.filter(isToday);
+  if (view === 'week')    incomplete = incomplete.filter(isThisWeek);
+  if (view === 'parking') incomplete = areaTodos.filter((t) => !t.done && t.parked);
+
+  // Sort: overdue first, then priority, then due date
+  const sorted = [...incomplete].sort((a, b) => {
+    const aOver = a.due != null && a.due < 0;
+    const bOver = b.due != null && b.due < 0;
+    if (aOver !== bOver) return aOver ? -1 : 1;
+    if (!!a.priority !== !!b.priority) return a.priority ? -1 : 1;
+    const ad = a.due == null ? Infinity : a.due;
+    const bd = b.due == null ? Infinity : b.due;
+    return ad - bd;
+  });
+
+  const doneToday = areaTodos.filter((t) => t.done && t.completedDay === 'today');
+  const [showDone, setShowDone] = useState(false);
+
+  const addTask = () => {
+    const title = newTitle.trim();
+    if (!title) return;
+    actions.addTodo({
+      id: Date.now(),
+      title,
+      account: acc.id,
+      done: false,
+      priority: false,
+      details: null,
+      due: view === 'today' ? 0 : null,
+      parked: view === 'parking',
+      now: false,
+      subtasks: [],
+    });
+    setNewTitle('');
+  };
+
+  return (
+    <div className="tdx-col">
+      <div className="tdx-col-head">
+        <AccountDot acc={acc.id} />
+        <span className="tdx-col-name">{acc.name}</span>
+        <span className="tdx-col-count">{sorted.length}</span>
+      </div>
+
+      {view !== 'parking' && (
+        <div className="tdx-add">
+          <span className="tdx-add-icon"><Icon.Plus /></span>
+          <input
+            className="tdx-add-input"
+            placeholder="Add a task…"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') addTask();
+              if (e.key === 'Escape') setNewTitle('');
+            }}
+          />
+        </div>
+      )}
+
+      <div className="tdx-col-list">
+        {sorted.map((t) => (
+          <TaskCard
+            key={t.id} t={t}
+            onToggle={() => toggleDone(t.id)}
+            onDelete={() => delTodo(t.id)}
+            onUpdate={(patch) => update(t.id, patch)}
+            onToggleSub={(sid) => toggleSub(t.id, sid)}
+            onAddSub={(txt) => addSubtask(t.id, txt)}
+          />
+        ))}
+
+        {sorted.length === 0 && (
+          <div className="tdx-col-empty">
+            {view === 'parking' ? 'Nothing parked.' : 'All clear.'}
+          </div>
+        )}
+      </div>
+
+      {doneToday.length > 0 && (
+        <div className="tdx-done">
+          <button className="tdx-done-toggle" onClick={() => setShowDone((s) => !s)}>
+            <Icon.Chevron style={{ transform: showDone ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 150ms' }} />
+            Done today · {doneToday.length}
+          </button>
+          {showDone && doneToday.map((t) => (
+            <TaskCard
+              key={t.id} t={t} compact
+              onToggle={() => toggleDone(t.id)}
+              onDelete={() => delTodo(t.id)}
+              onUpdate={(patch) => update(t.id, patch)}
+              onToggleSub={(sid) => toggleSub(t.id, sid)}
+              onAddSub={(txt) => addSubtask(t.id, txt)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// Task card — collapsed row + expandable editor (pill row)
+// ============================================================
+function TaskCard({ t, onToggle, onDelete, onUpdate, onToggleSub, onAddSub, compact }) {
+  const [expanded, setExpanded] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
   const [editTitle, setEditTitle] = useState(t.title);
-  const [editingDate, setEditingDate] = useState(false);
-  const [editingArea, setEditingArea] = useState(false);
+  const [subText, setSubText] = useState('');
+  const [pickDate, setPickDate] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
   const titleRef = useRef(null);
 
+  const overdue = t.due != null && t.due < 0 && !t.done;
+  const doneSubs = t.subtasks.filter((s) => s.done).length;
+
+  useEffect(() => { if (editingTitle) titleRef.current?.focus(); }, [editingTitle]);
   useEffect(() => {
     if (!menuOpen) return;
     const h = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
   }, [menuOpen]);
-
-  useEffect(() => {
-    if (editingTitle) titleRef.current?.focus();
-  }, [editingTitle]);
-
-  const overdue = t.due != null && t.due < 0 && !t.done;
 
   const saveTitle = () => {
     const trimmed = editTitle.trim();
@@ -370,211 +245,375 @@ function TodoRow({ t, expanded, onExpand, onToggle, onTogglePriority, onDelete, 
   };
 
   const todayISO = TODAY.toISOString().slice(0, 10);
-  const dueISO = t.due != null ? addDays(TODAY, t.due).toISOString().slice(0, 10) : "";
-
+  const dueISO = t.due != null ? addDays(TODAY, t.due).toISOString().slice(0, 10) : '';
   const saveDate = (val) => {
-    if (!val) {
-      onUpdate({ due: null });
-    } else {
-      const days = Math.round(
-        (new Date(val + "T12:00:00") - new Date(todayISO + "T12:00:00")) / 86400000
-      );
+    if (!val) onUpdate({ due: null });
+    else {
+      const days = Math.round((new Date(val + 'T12:00:00') - new Date(todayISO + 'T12:00:00')) / 86400000);
       onUpdate({ due: days });
     }
-    setEditingDate(false);
+    setPickDate(false);
   };
 
+  const dueLabel = t.due == null ? null
+    : t.due === 0 ? 'Today'
+    : t.due === 1 ? 'Tmrw'
+    : t.due < 0 ? `${Math.abs(t.due)}d late`
+    : fmtMD(addDays(TODAY, t.due));
+
   return (
-    <div className={"todo" + (t.done ? " is-done" : "") + (selected ? " is-selected" : "")}>
-      {selectMode && (
-        <input type="checkbox" checked={!!selected} onChange={onSelect}
-          onClick={(e) => e.stopPropagation()}
-          style={{ width: 15, height: 15, flexShrink: 0, marginTop: 2, accentColor: "var(--accent)", cursor: "pointer" }}
-        />
-      )}
-      {overdue && !selectMode && <span className="overdue-dot" />}
-      <Checkbox checked={t.done} accent={t.account} onChange={onToggle} circle size="sm" />
-      <div className="todo-main">
-        <div className="todo-title-row">
+    <div className={'tdx-task' + (t.done ? ' is-done' : '') + (expanded ? ' is-expanded' : '')}>
+      <div className="tdx-task-head">
+        <button
+          type="button"
+          className={'tdx-check' + (t.done ? ' is-checked' : '')}
+          data-acc={t.account}
+          onClick={(e) => { e.stopPropagation(); onToggle(); }}
+          aria-pressed={t.done}>
+          <Icon.Check />
+        </button>
+
+        <div className="tdx-task-body" onClick={() => !editingTitle && setExpanded((v) => !v)}>
           {editingTitle ? (
-            <input ref={titleRef}
+            <input
+              ref={titleRef}
+              className="tdx-title-input"
               value={editTitle}
               onChange={(e) => setEditTitle(e.target.value)}
               onBlur={saveTitle}
+              onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => {
-                if (e.key === "Enter") saveTitle();
-                if (e.key === "Escape") { setEditTitle(t.title); setEditingTitle(false); }
-              }}
-              style={{
-                flex: 1, border: "none", borderBottom: "1.5px solid var(--accent)", outline: "none",
-                fontSize: "14.5px", fontWeight: 500, background: "transparent", padding: "1px 0",
+                if (e.key === 'Enter') saveTitle();
+                if (e.key === 'Escape') { setEditTitle(t.title); setEditingTitle(false); }
               }}
             />
           ) : (
-            <span className="todo-title">{t.title}</span>
-          )}
-          <AccountDot acc={t.account} />
-          {t.priority && !t.done && (
-            <span style={{ color: "var(--text)", fontWeight: 700, fontSize: 13 }}>★</span>
-          )}
-          {(t.details || t.due != null || t.subtasks.length > 0) && !editingTitle && (
-            <button className="btn-text" style={{ padding: "2px 6px", fontSize: 12 }} onClick={onExpand}>
-              {expanded ? "Hide" : "Details"}
-            </button>
-          )}
-        </div>
-
-        {/* Inline area picker */}
-        {editingArea && (
-          <div className="fade-in" style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
-            {ACCOUNTS.map((a) => (
-              <button key={a.id}
-                className={"acc-chip" + (t.account === a.id ? " is-on" : "")}
-                onClick={() => { onUpdate({ account: a.id }); setEditingArea(false); }}
-                style={{ fontSize: 12 }}>
-                <AccountDot acc={a.id} />
-                <span>{a.short}</span>
-              </button>
-            ))}
-            <button className="btn-text" style={{ fontSize: 12, color: "var(--text-3)" }}
-              onClick={() => setEditingArea(false)}>Cancel</button>
-          </div>
-        )}
-
-        {/* Inline date picker */}
-        {editingDate && (
-          <div className="fade-in" style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
-            <input type="date" defaultValue={dueISO} autoFocus
-              onChange={(e) => saveDate(e.target.value)}
-              style={{
-                fontSize: 13, padding: "4px 8px",
-                border: "1.5px solid var(--border)", borderRadius: 6,
-                background: "var(--surface)", color: "var(--text)",
-              }}
-            />
-            {t.due != null && (
-              <button className="btn-text" style={{ fontSize: 12, color: "var(--error)" }}
-                onClick={() => saveDate("")}>Clear</button>
-            )}
-            <button className="btn-text" style={{ fontSize: 12, color: "var(--text-3)" }}
-              onClick={() => setEditingDate(false)}>Cancel</button>
-          </div>
-        )}
-
-        <div className="todo-meta">
-          {t.due != null && (
-            <span className={"meta-due" + (overdue ? " is-overdue" : "")}>
-              {overdue
-                ? `Overdue — Due ${fmtMD(addDays(TODAY, t.due))}`
-                : `Due ${fmtMD(addDays(TODAY, t.due))}`}
+            <span
+              className="tdx-title"
+              onDoubleClick={(e) => { e.stopPropagation(); setEditTitle(t.title); setEditingTitle(true); }}>
+              {t.title}
             </span>
           )}
-          {t.subtasks.length > 0 && (
-            <span>{t.subtasks.filter((s) => s.done).length}/{t.subtasks.length} subtasks</span>
+
+          {t.priority && !t.done && <span className="tdx-flag">★</span>}
+          {t.now && !t.done && <span className="tdx-now">now</span>}
+          {dueLabel && (
+            <span className={'tdx-due' + (overdue ? ' is-overdue' : '')}>{dueLabel}</span>
           )}
-          {showCompletedAgo && <span>Completed {t.completedAgo || "earlier today"}</span>}
+          {t.subtasks.length > 0 && (
+            <span className="tdx-sub-count">{doneSubs}/{t.subtasks.length}</span>
+          )}
         </div>
 
-        {!t.done && (
-          <div className="due-bubbles">
+        {!compact && (
+          <div className="tdx-actions">
             <button
-              className={"due-bubble" + (t.due === 0 ? " is-active" : "")}
-              onClick={() => onUpdate({ due: t.due === 0 ? null : 0 })}
-              title="Due today">
-              <Icon.Sun /> Today
-            </button>
-            <button
-              className={"due-bubble" + (t.due === 1 ? " is-active" : "")}
-              onClick={() => onUpdate({ due: t.due === 1 ? null : 1 })}
-              title="Due tomorrow">
-              <Icon.Cal /> Tmrw
-            </button>
-            <button
-              className={"due-bubble" + (editingDate ? " is-active" : "")}
-              onClick={() => setEditingDate(v => !v)}
-              title="Pick a date">
+              className={'tdx-act' + (t.parked ? ' is-on' : '')}
+              title={t.parked ? 'Un-park' : 'Park'}
+              onClick={(e) => { e.stopPropagation(); onUpdate({ parked: !t.parked }); }}>
               <Icon.Clock />
             </button>
+            <div style={{ position: 'relative' }} ref={menuRef}>
+              <button className={'tdx-act' + (menuOpen ? ' is-on' : '')}
+                onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }} title="More">
+                <Icon.Kebab />
+              </button>
+              {menuOpen && (
+                <div className="tdx-menu">
+                  <button onClick={() => { setEditTitle(t.title); setEditingTitle(true); setMenuOpen(false); }}>Edit title</button>
+                  <button onClick={() => { onUpdate({ now: !t.now }); setMenuOpen(false); }}>
+                    {t.now ? 'Remove from Focus' : 'Add to Focus'}
+                  </button>
+                  <button onClick={() => { onUpdate({ parked: !t.parked }); setMenuOpen(false); }}>
+                    {t.parked ? 'Un-park' : 'Park'}
+                  </button>
+                  <div className="tdx-menu-sep" />
+                  <button className="is-danger" onClick={() => { onDelete(); setMenuOpen(false); }}>Delete</button>
+                </div>
+              )}
+            </div>
           </div>
         )}
+      </div>
 
-        {expanded && (
-          <div className="fade-in" style={{ marginTop: 10, padding: "10px 12px", background: "var(--surface)", borderRadius: 8, fontSize: 13, color: "var(--text-2)" }}>
-            {t.details || <span className="muted">No details yet.</span>}
+      {expanded && !compact && (
+        <div className="tdx-editor fade-in">
+          <div className="tdx-pills">
+            <button className={'tdx-pill' + (t.due === 0 ? ' is-on' : '')}
+              onClick={() => onUpdate({ due: t.due === 0 ? null : 0 })} title="Due today">!</button>
+            <button className={'tdx-pill' + (t.due === 1 ? ' is-on' : '')}
+              onClick={() => onUpdate({ due: t.due === 1 ? null : 1 })} title="Due tomorrow">!!</button>
+            <button className={'tdx-pill' + (t.due === 7 ? ' is-on' : '')}
+              onClick={() => onUpdate({ due: t.due === 7 ? null : 7 })} title="End of week">EOW</button>
+            <button className={'tdx-pill icon-only' + (pickDate ? ' is-on' : '')}
+              onClick={() => setPickDate((v) => !v)} title="Pick a date"><Icon.Clock /></button>
+            <button className={'tdx-pill' + (t.priority ? ' is-on' : '')}
+              onClick={() => onUpdate({ priority: !t.priority })} title="Flag priority">★</button>
+            <button className={'tdx-pill focus-pill' + (t.now ? ' is-on' : '')}
+              onClick={() => onUpdate({ now: !t.now })} title="Add to Focus">＋ Focus</button>
+            <button className={'tdx-pill park-pill' + (t.parked ? ' is-on' : '')}
+              onClick={() => onUpdate({ parked: !t.parked })}>Park</button>
+            <button className="tdx-pill del-pill" onClick={onDelete} title="Delete"><Icon.X /></button>
           </div>
-        )}
 
-        {t.subtasks.length > 0 && (
-          <div className="subtasks">
+          {pickDate && (
+            <div className="tdx-datepick">
+              <input type="date" defaultValue={dueISO} autoFocus onChange={(e) => saveDate(e.target.value)} />
+              {t.due != null && <button className="tdx-link-danger" onClick={() => saveDate('')}>Clear</button>}
+            </div>
+          )}
+
+          <textarea
+            className="tdx-notes"
+            placeholder="Add notes…"
+            defaultValue={t.details || ''}
+            onBlur={(e) => {
+              const v = e.target.value.trim();
+              if (v !== (t.details || '')) onUpdate({ details: v || null });
+            }}
+          />
+
+          <div className="tdx-subs">
             {t.subtasks.map((s) => (
-              <div key={s.id} className={"subtask" + (s.done ? " is-done" : "")}>
-                <Checkbox checked={s.done} onChange={() => onToggleSub(s.id)} accent={t.account} size="xs" circle />
+              <div key={s.id} className={'tdx-sub' + (s.done ? ' is-done' : '')}>
+                <button
+                  type="button"
+                  className={'tdx-check tdx-check-sm' + (s.done ? ' is-checked' : '')}
+                  data-acc={t.account}
+                  onClick={() => onToggleSub(s.id)}>
+                  <Icon.Check />
+                </button>
                 <span>{s.text}</span>
               </div>
             ))}
-            {!t.done && (
-              <div className="subtask-add">
-                <Icon.Plus />
-                <input
-                  placeholder="Add subtask"
-                  value={subText}
-                  onChange={(e) => setSubText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") { onAddSub(subText); setSubText(""); }
-                    if (e.key === "Escape") setSubText("");
-                  }}
-                  style={{ border: "none", background: "transparent", outline: "none", flex: 1, fontSize: 13 }}
-                />
-              </div>
-            )}
-          </div>
-        )}
-        {t.subtasks.length === 0 && !t.done && expanded && (
-          <div className="subtasks">
-            <div className="subtask-add">
+            <div className="tdx-sub-add">
               <Icon.Plus />
               <input
                 placeholder="Add subtask"
                 value={subText}
                 onChange={(e) => setSubText(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") { onAddSub(subText); setSubText(""); }
+                  if (e.key === 'Enter') { onAddSub(subText); setSubText(''); }
+                  if (e.key === 'Escape') setSubText('');
                 }}
-                style={{ border: "none", background: "transparent", outline: "none", flex: 1, fontSize: 13 }}
               />
             </div>
           </div>
-        )}
-      </div>
-
-      <div className="todo-actions">
-        <button onClick={onTogglePriority} title="Toggle priority" className={t.priority ? "is-on" : ""}>
-          {t.priority ? <Icon.StarFill /> : <Icon.Star />}
-        </button>
-        <button onClick={onDelete} title="Delete"><Icon.X /></button>
-        <div style={{ position: "relative" }} ref={menuRef}>
-          <button onClick={() => setMenuOpen(v => !v)} title="More" className={menuOpen ? "is-on" : ""}>
-            <Icon.Kebab />
-          </button>
-          {menuOpen && (
-            <div className="todo-menu">
-              <button onClick={() => { setEditTitle(t.title); setEditingTitle(true); setMenuOpen(false); }}>
-                Edit title
-              </button>
-              <button onClick={() => { setEditingArea(true); setMenuOpen(false); }}>
-                Change area
-              </button>
-              <button onClick={() => { setEditingDate(true); setMenuOpen(false); }}>
-                {t.due != null ? "Change due date" : "Set due date"}
-              </button>
-              <div className="todo-menu-sep" />
-              <button className="is-danger" onClick={() => { onDelete(); setMenuOpen(false); }}>
-                Delete
-              </button>
-            </div>
-          )}
         </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// Focus mode — self-contained timer + cross-area "now" list
+// ============================================================
+function FocusView({ todos, actions }) {
+  const [timer, setTimer] = useState(loadTimer);
+  const [choice, setChoice] = useState('25/5');
+  const [, forceTick] = useState(0);
+  const [newTitle, setNewTitle] = useState('');
+  const [newAccount, setNewAccount] = useState('getro');
+  const notifiedRef = useRef(false);
+
+  // persist on every change
+  useEffect(() => { saveTimer(timer); }, [timer]);
+
+  // tick once a second while running
+  useEffect(() => {
+    if (!timer || !timer.active || timer.paused) return;
+    const i = setInterval(() => forceTick((n) => n + 1), 1000);
+    return () => clearInterval(i);
+  }, [timer]);
+
+  const remaining = remainingSeconds(timer);
+  const ended = timer && timer.active && !timer.paused && remaining <= 0;
+
+  // fire a notification + chime once when a phase ends
+  useEffect(() => {
+    if (!ended) { notifiedRef.current = false; return; }
+    if (notifiedRef.current) return;
+    notifiedRef.current = true;
+    try {
+      if ('Notification' in window) {
+        if (Notification.permission === 'granted') {
+          new Notification(timer.phase === 'work' ? 'Focus block complete' : 'Break over', {
+            body: timer.phase === 'work' ? 'Time for a break.' : 'Back to it.',
+          });
+        } else if (Notification.permission !== 'denied') {
+          Notification.requestPermission();
+        }
+      }
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = 660; gain.gain.value = 0.15;
+      osc.start(); osc.stop(ctx.currentTime + 0.35);
+    } catch {}
+  }, [ended, timer]);
+
+  const nowTasks = todos.filter((t) => t.now);
+
+  const startSession = () => {
+    const d = DURATIONS.find((x) => x.id === choice) || DURATIONS[0];
+    if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission();
+    setTimer({
+      active: true, paused: false, phase: 'work',
+      workMin: d.work, breakMin: d.brk,
+      endsAt: Date.now() + d.work * 60000,
+      pausedRemaining: 0, pomodoros: 0,
+    });
+  };
+
+  const pauseResume = () => setTimer((t) => {
+    if (!t) return t;
+    if (t.paused) return { ...t, paused: false, endsAt: Date.now() + t.pausedRemaining * 1000 };
+    return { ...t, paused: true, pausedRemaining: remainingSeconds(t) };
+  });
+
+  const addFive = () => setTimer((t) => t ? { ...t, endsAt: (t.paused ? Date.now() : t.endsAt) + 5 * 60000, pausedRemaining: t.paused ? t.pausedRemaining + 300 : t.pausedRemaining } : t);
+
+  const stop = () => setTimer(null);
+
+  const startBreak = () => setTimer((t) => ({
+    ...t, phase: 'break', paused: false,
+    endsAt: Date.now() + t.breakMin * 60000,
+    pomodoros: (t.pomodoros || 0) + 1,
+  }));
+
+  const newSession = (carryOver) => {
+    if (!carryOver) nowTasks.forEach((t) => actions.updateTodo(t.id, { now: false }));
+    setTimer(null);
+  };
+
+  const addFocusTask = () => {
+    const title = newTitle.trim();
+    if (!title) return;
+    actions.addTodo({
+      id: Date.now(), title, account: newAccount,
+      done: false, priority: false, details: null, due: null,
+      parked: false, now: true, subtasks: [],
+    });
+    setNewTitle('');
+  };
+
+  const isBreak = timer && timer.phase === 'break';
+  const total = timer ? (isBreak ? timer.breakMin : timer.workMin) * 60 : 1;
+  const progress = timer ? Math.min(100, Math.max(0, (1 - remaining / total) * 100)) : 0;
+
+  const focusList = (
+    <div className="tdx-focus-list">
+      {nowTasks.length === 0 ? (
+        <div className="tdx-focus-empty">No focus tasks yet — add one below.</div>
+      ) : nowTasks.map((t) => (
+        <div key={t.id} className={'tdx-focus-task' + (t.done ? ' is-done' : '')}>
+          <button
+            type="button"
+            className={'tdx-check' + (t.done ? ' is-checked' : '')}
+            data-acc={t.account}
+            onClick={() => actions.toggleDone(t.id)}>
+            <Icon.Check />
+          </button>
+          <span className="tdx-focus-task-text">{t.title}</span>
+          <button className="tdx-focus-remove" title="Remove from Focus"
+            onClick={() => actions.updateTodo(t.id, { now: false })}>
+            <Icon.X />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+
+  const addField = (
+    <div className="tdx-focus-add">
+      <span className="tdx-add-icon"><Icon.Plus /></span>
+      <input
+        placeholder="Add a task to focus on…"
+        value={newTitle}
+        onChange={(e) => setNewTitle(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') addFocusTask(); }}
+      />
+      <div className="tdx-focus-acc">
+        {ACCOUNTS.map((a) => (
+          <button key={a.id}
+            className={'tdx-acc-dot' + (newAccount === a.id ? ' is-on' : '')}
+            title={a.name}
+            onClick={() => setNewAccount(a.id)}>
+            <AccountDot acc={a.id} />
+          </button>
+        ))}
       </div>
+    </div>
+  );
+
+  return (
+    <div className="tdx-focus">
+      {!timer ? (
+        // ---- setup ----
+        <>
+          <div className="tdx-chips">
+            {DURATIONS.map((d) => (
+              <button key={d.id}
+                className={'tdx-chip' + (choice === d.id ? ' is-on' : '')}
+                onClick={() => setChoice(d.id)}>
+                <span className="tdx-chip-time">{d.label}</span>
+                <span className="tdx-chip-label">work / break</span>
+              </button>
+            ))}
+          </div>
+          {addField}
+          {focusList}
+          <button className="tdx-focus-start" onClick={startSession} disabled={nowTasks.length === 0}>
+            Start focus session
+          </button>
+        </>
+      ) : ended ? (
+        // ---- ended ----
+        <div className="tdx-timer-card">
+          <div className="tdx-timer-top">
+            <div className="tdx-timer-phase">{isBreak ? 'Break over' : 'Focus block complete'}</div>
+            <div className="tdx-timer-time">{isBreak ? '☕' : '✓'}</div>
+            <div className="tdx-timer-meta">{(timer.pomodoros || 0)} pomodoro{(timer.pomodoros || 0) === 1 ? '' : 's'} done</div>
+          </div>
+          {!isBreak && (
+            <button className="tdx-break-btn" onClick={startBreak}>Start {timer.breakMin}-min break</button>
+          )}
+          <div className="tdx-new-label">New session</div>
+          <div className="tdx-session-opts">
+            <button className="tdx-session-opt" onClick={() => newSession(true)}>Carry over</button>
+            <button className="tdx-session-opt" onClick={() => newSession(false)}>Start fresh</button>
+          </div>
+        </div>
+      ) : (
+        // ---- running ----
+        <>
+          <div className="tdx-timer-card">
+            <div className="tdx-timer-top">
+              <div className={'tdx-timer-phase' + (isBreak ? ' is-break' : '')}>{isBreak ? 'Break' : 'Focus'}</div>
+              <div className="tdx-timer-time">{fmtTime(remaining)}</div>
+              <div className="tdx-timer-meta">{timer.paused ? 'Paused' : (isBreak ? `${timer.breakMin}-min break` : `${timer.workMin}-min block`)}</div>
+            </div>
+            <div className="tdx-progress">
+              <div className={'tdx-progress-fill' + (isBreak ? ' is-break' : '')} style={{ width: progress + '%' }} />
+            </div>
+            <div className="tdx-timer-controls">
+              <button className="tdx-timer-btn" onClick={pauseResume}>{timer.paused ? 'Resume' : 'Pause'}</button>
+              <button className="tdx-timer-btn" onClick={addFive}>+5 min</button>
+              <button className="tdx-timer-btn is-danger" onClick={stop}>Stop</button>
+            </div>
+            {(timer.pomodoros || 0) > 0 && (
+              <div className="tdx-pomo">{'🍅'.repeat(timer.pomodoros)}</div>
+            )}
+          </div>
+          {!isBreak && (
+            <>
+              {addField}
+              {focusList}
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 }
