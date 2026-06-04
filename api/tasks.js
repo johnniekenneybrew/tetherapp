@@ -168,8 +168,13 @@ export default async function handler(req, res) {
         labels:      taskLabels,
         priority:    toTodoistPriority(priority),
       };
-      // Only set project for top-level tasks; subtasks inherit from parent
-      if (!parentId) {
+      if (parentId) {
+        // Match the parent's project so the subtask lands in the same place
+        try {
+          const parent = await getTask(parentId);
+          if (parent.project_id) payload.project_id = parent.project_id;
+        } catch { /* fall through — Todoist will use Inbox */ }
+      } else {
         const acc = ACCOUNT_IDS.has(account) ? account : "personal";
         payload.project_id = accToProjectId[acc];
       }
