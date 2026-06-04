@@ -242,7 +242,7 @@ async function apiAddSub(task, text) {
   tasks = tasks.map(t => t.id === task.id ? { ...t, subtasks: [...t.subtasks, temp] } : t);
   renderList();
   try {
-    const created = await apiFetch('POST', '/tasks', { title: text, account: task.account, done: false, parentId: task.id });
+    const created = await apiFetch('POST', '/tasks', { title: text, done: false, parentId: task.id });
     tasks = tasks.map(t =>
       t.id === task.id
         ? { ...t, subtasks: t.subtasks.map(s => s.id === temp.id ? { ...temp, id: created.id } : s) }
@@ -385,7 +385,7 @@ async function demoteToSubtask(tid) {
   renderList();
   try {
     if (!task._draft) await apiFetch('DELETE', '/tasks', { id: tid });
-    const created = await apiFetch('POST', '/tasks', { title, account: prev.account, done: false, parentId: prev.id });
+    const created = await apiFetch('POST', '/tasks', { title, done: false, parentId: prev.id });
     tasks = tasks.map(t => t.id === prev.id
       ? { ...t, subtasks: t.subtasks.map(s => s.id === subTempId ? { id: created.id, text: title, done: false } : s) }
       : t);
@@ -430,7 +430,7 @@ async function commitSubDraft(parentId, subTempId, text) {
     ? { ...t, subtasks: t.subtasks.map(s => s.id === subTempId ? { ...s, text, _draft: false } : s) }
     : t);
   try {
-    const created = await apiFetch('POST', '/tasks', { title: text, account: parent.account, done: false, parentId });
+    const created = await apiFetch('POST', '/tasks', { title: text, done: false, parentId });
     tasks = tasks.map(t => t.id === parentId
       ? { ...t, subtasks: t.subtasks.map(s => s.id === subTempId ? { id: created.id, text, done: false } : s) }
       : t);

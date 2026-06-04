@@ -239,7 +239,6 @@ export function useAppData() {
       const parent = state.todos.find((t) => t.id === todoId);
       tasksApi.create({
         title: text.trim(),
-        account: parent?.account || "personal",
         done: false,
         priority: false,
         parentId: todoId,

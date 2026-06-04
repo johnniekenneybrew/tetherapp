@@ -123,7 +123,7 @@ async function apiAddSub(task, text) {
   tasks = tasks.map(t => t.id === task.id ? { ...t, subtasks: [...t.subtasks, temp] } : t);
   renderList();
   try {
-    const created = await apiFetch('POST', '/tasks', { title: text, account: task.account, done: false, parentId: task.id });
+    const created = await apiFetch('POST', '/tasks', { title: text, done: false, parentId: task.id });
     tasks = tasks.map(t =>
       t.id === task.id
         ? { ...t, subtasks: t.subtasks.map(s => s.id === temp.id ? { ...temp, id: created.id } : s) }

@@ -157,7 +157,6 @@ export default async function handler(req, res) {
     if (req.method === "POST") {
       const { title, account, done, priority, details, due, parentId, parked, now, labels } = req.body;
 
-      const acc = ACCOUNT_IDS.has(account) ? account : "personal";
       const taskLabels = [];
       if (parked) taskLabels.push("parked");
       if (now)    taskLabels.push("now");
@@ -166,10 +165,14 @@ export default async function handler(req, res) {
       const payload = {
         content:     title,
         description: details || "",
-        project_id:  accToProjectId[acc],
         labels:      taskLabels,
         priority:    toTodoistPriority(priority),
       };
+      // Only set project for top-level tasks; subtasks inherit from parent
+      if (!parentId) {
+        const acc = ACCOUNT_IDS.has(account) ? account : "personal";
+        payload.project_id = accToProjectId[acc];
+      }
       if (due != null) payload.due_date = dueToIso(due);
       if (parentId)    payload.parent_id = parentId;
 
