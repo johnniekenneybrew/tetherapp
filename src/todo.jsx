@@ -367,6 +367,23 @@ function TaskCard({ t, onToggle, onDelete, onUpdate, onToggleSub, onAddSub, comp
         )}
       </div>
 
+      {!expanded && !compact && !t.done && t.subtasks.length > 0 && (
+        <div className="tdx-subs-inline">
+          {t.subtasks.map((s) => (
+            <div key={s.id} className={'tdx-sub-inline' + (s.done ? ' is-done' : '')}>
+              <button
+                type="button"
+                className={'tdx-check tdx-check-sm' + (s.done ? ' is-checked' : '')}
+                data-acc={t.account}
+                onClick={(e) => { e.stopPropagation(); onToggleSub(s.id); }}>
+                <Icon.Check />
+              </button>
+              <span className="tdx-sub-inline-text">{s.text}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {expanded && !compact && (
         <div className="tdx-editor fade-in">
           <div className="tdx-pills">

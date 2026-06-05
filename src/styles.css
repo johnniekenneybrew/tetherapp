@@ -918,8 +918,8 @@ textarea.input.is-filled--green {
 .tdx-check[data-acc="personal"].is-checked { background: var(--acc-personal); }
 .tdx-check-sm { width: 16px; height: 16px; }
 
-.tdx-task-body { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; cursor: pointer; }
-.tdx-title { font-size: 13.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tdx-task-body { flex: 1; min-width: 0; display: flex; align-items: flex-start; gap: 7px; cursor: pointer; flex-wrap: wrap; }
+.tdx-title { font-size: 13.5px; color: var(--text); word-break: break-word; }
 .tdx-task.is-done .tdx-title { color: var(--text-3); text-decoration: line-through; }
 .tdx-title-input {
   flex: 1; border: none; border-bottom: 1.5px solid var(--tdx-brand);
@@ -998,6 +998,12 @@ textarea.input.is-filled--green {
 .tdx-sub { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text); }
 .tdx-sub.is-done span { color: var(--text-3); text-decoration: line-through; }
 .tdx-sub-add { display: flex; align-items: center; gap: 8px; color: var(--text-3); }
+
+/* Inline subtasks (collapsed view) */
+.tdx-subs-inline { display: flex; flex-direction: column; gap: 2px; padding: 0 8px 6px 36px; }
+.tdx-sub-inline { display: flex; align-items: flex-start; gap: 8px; padding: 3px 0; }
+.tdx-sub-inline-text { font-size: 12.5px; color: var(--text); word-break: break-word; }
+.tdx-sub-inline.is-done .tdx-sub-inline-text { color: var(--text-3); text-decoration: line-through; }
 
 /* Done today */
 .tdx-done { border-top: 1px solid var(--border-soft); padding: 6px; }
