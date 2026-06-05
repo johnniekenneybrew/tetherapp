@@ -44,6 +44,7 @@ const DURATIONS = [
 // ============================================================
 export function TodoList({ state, actions }) {
   const [view, setView] = useState('active');
+  const [labelFilter, setLabelFilter] = useState(null);
   const todos = state.todos;
 
   const update      = (id, patch) => actions.updateTodo(id, patch);
@@ -54,6 +55,13 @@ export function TodoList({ state, actions }) {
 
   const focusCount = todos.filter((t) => t.now && !t.done).length;
   const parkedCount = todos.filter((t) => t.parked && !t.done).length;
+
+  // Collect all unique non-system labels from active tasks
+  const availableLabels = useMemo(() => {
+    const seen = new Set();
+    todos.forEach((t) => (t.labels || []).forEach((l) => seen.add(l)));
+    return [...seen].sort();
+  }, [todos]);
 
   return (
     <div className="page tdx-page fade-in">
@@ -73,6 +81,24 @@ export function TodoList({ state, actions }) {
         })}
       </div>
 
+      {availableLabels.length > 0 && view !== 'focus' && (
+        <div className="tdx-label-filters">
+          <button
+            className={'tdx-label-filter' + (!labelFilter ? ' is-on' : '')}
+            onClick={() => setLabelFilter(null)}>
+            All
+          </button>
+          {availableLabels.map((l) => (
+            <button
+              key={l}
+              className={'tdx-label-filter' + (labelFilter === l ? ' is-on' : '')}
+              onClick={() => setLabelFilter(labelFilter === l ? null : l)}>
+              {l}
+            </button>
+          ))}
+        </div>
+      )}
+
       {view === 'focus' ? (
         <FocusView todos={todos} actions={actions} />
       ) : (
@@ -83,6 +109,7 @@ export function TodoList({ state, actions }) {
               acc={acc}
               view={view}
               todos={todos}
+              labelFilter={labelFilter}
               actions={actions}
               update={update}
               toggleDone={toggleDone}
@@ -100,7 +127,7 @@ export function TodoList({ state, actions }) {
 // ============================================================
 // A single area column
 // ============================================================
-function BoardColumn({ acc, view, todos, actions, update, toggleDone, delTodo, addSubtask, toggleSub }) {
+function BoardColumn({ acc, view, todos, labelFilter, actions, update, toggleDone, delTodo, addSubtask, toggleSub }) {
   const [newTitle, setNewTitle] = useState('');
 
   const areaTodos = useMemo(
@@ -115,6 +142,7 @@ function BoardColumn({ acc, view, todos, actions, update, toggleDone, delTodo, a
   if (view === 'today')   incomplete = incomplete.filter(isToday);
   if (view === 'week')    incomplete = incomplete.filter(isThisWeek);
   if (view === 'parking') incomplete = areaTodos.filter((t) => !t.done && t.parked);
+  if (labelFilter)        incomplete = incomplete.filter((t) => (t.labels || []).includes(labelFilter));
 
   // Sort: overdue first, then priority, then due date
   const sorted = [...incomplete].sort((a, b) => {

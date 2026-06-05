@@ -842,6 +842,21 @@ textarea.input.is-filled--green {
 }
 .tdx-tab.is-on .tdx-tab-badge { background: var(--tdx-brand); color: #fff; }
 
+/* Label filters */
+.tdx-label-filters {
+  display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 0 4px;
+}
+.tdx-label-filter {
+  font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .04em;
+  padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border);
+  background: var(--surface-1); color: var(--text-2); cursor: pointer;
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+}
+.tdx-label-filter:hover { background: var(--surface-2); color: var(--text-1); }
+.tdx-label-filter.is-on {
+  background: var(--tdx-brand); color: #fff; border-color: var(--tdx-brand);
+}
+
 /* Board */
 .tdx-board {
   display: grid;
