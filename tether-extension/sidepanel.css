@@ -1,0 +1,771 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:          #FFFFFF;
+  --surface:     #FAFAFA;
+  --surface-2:   #F4F4F5;
+  --border:      #E5E5E5;
+  --border-soft: #F1F1F2;
+  --text:        #1A1A1A;
+  --text-2:      #5F6368;
+  --text-3:      #A0A0A0;
+  --brand:       #6C63FF;
+  --brand-soft:  rgba(108,99,255,0.08);
+  --brand-tint:  rgba(108,99,255,0.05);
+  --error:       #EF4444;
+  --success:     #10B981;
+  --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+html, body, #app {
+  height: 100%; width: 100%;
+  background: var(--bg); color: var(--text);
+  font-family: var(--font); font-size: 14px;
+  line-height: 1.5; -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.005em;
+}
+
+#app { display: flex; flex-direction: column; overflow: hidden; }
+
+/* ── Header ─────────────────────────────────────────── */
+#s-header {
+  padding: 12px 16px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.s-header-row {
+  display: flex; align-items: center;
+  justify-content: space-between; gap: 12px; margin-bottom: 10px;
+}
+
+.s-brand {
+  display: flex; align-items: center; gap: 8px;
+  flex: 1;
+}
+
+.s-brand-name {
+  font-size: 14px; color: var(--text); letter-spacing: -0.02em;
+}
+
+.s-brand-name em { font-style: normal; font-weight: 300; }
+.s-brand-name strong { font-weight: 600; }
+
+.s-header-right {
+  display: flex; align-items: center; gap: 10px;
+}
+
+/* Clear completed button */
+.s-clear-btn {
+  padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 500;
+  border: none; background: transparent; color: var(--text-3); cursor: pointer;
+  font-family: var(--font); transition: color 100ms;
+}
+
+.s-clear-btn:hover { color: var(--text-2); }
+
+/* Account filter */
+.s-filter-wrap { position: relative; }
+
+.s-filter-btn {
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 8px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+  font-size: 11px; font-weight: 500; color: var(--text-2);
+  font-family: var(--font); transition: border-color 100ms;
+}
+
+.s-filter-btn:hover { border-color: var(--text-3); }
+
+.s-filter-dropdown {
+  position: absolute; top: calc(100% + 4px); right: 0;
+  width: 180px; background: var(--bg);
+  border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 20;
+  padding: 4px; display: flex; flex-direction: column;
+}
+
+.s-filter-opt {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; border-radius: 6px; cursor: pointer;
+  background: transparent; border: none; font-size: 12px;
+  font-weight: 500; color: var(--text); font-family: var(--font);
+  width: 100%; text-align: left; transition: background 100ms;
+}
+
+.s-filter-opt:hover { background: var(--surface); }
+.s-filter-opt.is-active { background: var(--surface-2); font-weight: 600; }
+
+/* View tabs (All / Today / This week / Parking) */
+.s-view-tabs {
+  display: flex; gap: 20px;
+}
+
+.s-view-tab {
+  padding: 0; border: none; background: transparent;
+  font-size: 12px; font-weight: 500; color: var(--text-3);
+  cursor: pointer; font-family: var(--font);
+  transition: color 100ms;
+  border-bottom: 2px solid transparent;
+  padding-bottom: 6px;
+  position: relative;
+}
+
+.s-view-tab:hover { color: var(--text-2); }
+.s-view-tab.is-on {
+  color: var(--brand);
+  border-bottom-color: var(--brand);
+}
+
+/* ── Main content ───────────────────────────────────────── */
+#s-list-wrap {
+  flex: 1; overflow: hidden; display: flex; flex-direction: column;
+}
+
+#s-list {
+  flex: 1; overflow-y: auto; padding: 0;
+}
+
+.s-spinner-wrap {
+  display: flex; align-items: center; justify-content: center;
+  height: 100%; padding: 20px;
+}
+
+.s-spinner {
+  width: 32px; height: 32px;
+  border: 2px solid var(--border);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.s-error-msg {
+  padding: 20px; text-align: center;
+  color: var(--error); font-size: 13px;
+}
+
+.s-retry-btn {
+  margin-top: 12px; padding: 6px 16px;
+  border: 1px solid var(--border); background: var(--surface);
+  border-radius: 4px; cursor: pointer; font-family: var(--font);
+  font-size: 12px; transition: all 100ms;
+}
+
+.s-retry-btn:hover { border-color: var(--text-3); background: var(--surface-2); }
+
+.s-empty-msg {
+  padding: 32px 16px; text-align: center;
+  color: var(--text-3); font-size: 13px;
+}
+
+.s-section-header {
+  padding: 20px 16px 8px; font-size: 11px; font-weight: 600;
+  color: var(--text-3); text-transform: uppercase;
+  letter-spacing: 0.6px;
+  border-top: 1px solid var(--border-soft);
+  margin-top: 8px;
+}
+
+.s-idea-add-row {
+  padding: 10px 16px;
+}
+
+/* ── Add task row ──────────────────────────────────────── */
+.s-add-row {
+  padding: 12px 16px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+
+.s-add-input {
+  border: none; background: transparent;
+  font-size: 14px; font-family: var(--font); color: var(--text);
+  padding: 0; outline: none;
+}
+
+.s-add-input::placeholder { color: var(--text-3); }
+
+.s-idea-input {
+  resize: none;
+  overflow: hidden;
+  line-height: 1.5;
+  word-break: break-word;
+  white-space: pre-wrap;
+  min-height: 21px;
+}
+
+.s-add-expanded {
+  background: transparent; padding: 10px 12px;
+  border-radius: 8px;
+}
+
+.s-add-details {
+  width: 100%; border: none; background: transparent;
+  font-family: var(--font); font-size: 13px;
+  color: var(--text); outline: none; resize: none;
+  padding: 0; min-height: 40px;
+}
+
+.s-add-details::placeholder { color: var(--text-3); }
+
+.s-add-hint {
+  font-size: 11px; color: var(--text-3);
+  margin-top: 8px; margin-bottom: 8px;
+}
+
+.s-pill-row {
+  display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px;
+}
+
+/* ── Task row ──────────────────────────────────────────── */
+.s-task {
+  padding: 0;
+  position: relative;
+  margin: 1px 6px;
+  border-radius: 8px;
+}
+
+.s-task:not(.is-done):hover {
+  background: var(--surface);
+}
+
+.s-task.is-expanded {
+  background: var(--surface);
+}
+
+.s-task-header {
+  padding: 10px 10px; display: flex; align-items: center; gap: 8px;
+  cursor: pointer;
+}
+
+.s-check {
+  flex-shrink: 0; width: 20px; height: 20px;
+  border-radius: 50%; border: 1.5px solid var(--border);
+  background: transparent; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 100ms;
+  color: var(--text);
+}
+
+.s-check:hover { border-color: var(--text-3); }
+.s-check.is-checked { border: none; }
+
+.s-task-body {
+  flex: 1; display: flex; align-items: center; gap: 8px;
+  min-width: 0;
+}
+
+.s-task-title {
+  flex: 1; outline: none; word-break: break-word;
+  font-size: 14px; color: var(--text);
+}
+
+.s-task.is-done .s-task-title {
+  color: var(--text-3); text-decoration: line-through;
+}
+
+.s-due-pill {
+  flex-shrink: 0; font-size: 11px; font-weight: 500;
+  padding: 3px 8px; background: var(--border-soft);
+  border-radius: 12px; white-space: nowrap;
+}
+
+.s-overdue-dot {
+  flex-shrink: 0; width: 8px; height: 8px;
+  border-radius: 50%; background: #e53e3e;
+  display: inline-block;
+}
+
+.s-actions-hover {
+  display: flex; gap: 4px; opacity: 0;
+  transition: opacity 100ms;
+}
+
+.s-task-header:hover .s-actions-hover,
+.s-task .s-actions-hover:has(.s-menu-popup) {
+  opacity: 1;
+}
+
+.s-action-btn {
+  width: 20px; height: 20px; display: flex;
+  align-items: center; justify-content: center;
+  border: none; background: transparent; cursor: pointer;
+  color: var(--text-3); border-radius: 4px;
+  transition: all 100ms;
+}
+
+.s-action-btn:hover {
+  background: var(--border-soft); color: var(--text-2);
+}
+
+.s-park-btn {
+  color: var(--text-3);
+}
+
+/* ── Menu popup ───────────────────────────────────────── */
+.s-menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.s-menu-popup {
+  position: absolute; top: calc(100% + 4px); right: 0;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  z-index: 30; padding: 4px; display: flex; flex-direction: column;
+  min-width: 160px;
+}
+
+.s-menu-label {
+  font-size: 10px; font-weight: 600; color: var(--text-3);
+  text-transform: uppercase; padding: 6px 10px;
+}
+
+.s-menu-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; border-radius: 4px; border: none;
+  background: transparent; color: var(--text); cursor: pointer;
+  font-size: 12px; font-family: var(--font);
+  transition: background 100ms;
+  text-align: left;
+}
+
+.s-menu-item:hover { background: var(--surface); }
+.s-menu-item.is-active { background: var(--surface-2); font-weight: 600; }
+.s-menu-item.is-danger { color: var(--error); }
+
+.s-menu-divider {
+  height: 1px; background: var(--border-soft); margin: 2px 0;
+}
+
+/* ── Subtasks inline (collapsed) ────────────────────── */
+.s-subtasks-inline {
+  padding: 0 10px 6px 38px;
+  margin-top: -4px;
+}
+
+.s-subtask {
+  display: flex; align-items: center; gap: 8px;
+  padding: 1px 0; font-size: 13px;
+}
+
+.s-subtask.is-done {
+  color: var(--text-3);
+}
+
+.s-subtask.is-done .s-subtask-text-inline {
+  text-decoration: line-through;
+}
+
+.s-subtask-check {
+  flex-shrink: 0; width: 16px; height: 16px;
+  border-radius: 50%; border: 1.5px solid var(--border);
+  background: transparent; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; transition: all 100ms;
+  color: #fff;
+}
+
+.s-subtask-check:hover { border-color: var(--text-3); }
+.s-subtask-check.is-checked { border: none; }
+
+.s-subtask-text-inline {
+  flex: 1; outline: none; word-break: break-word;
+}
+
+.s-subtask-text-inline:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-3);
+  pointer-events: none;
+}
+
+/* Make empty contenteditable subtasks visible with placeholder + min-width */
+.s-subtask-text {
+  flex: 1; outline: none;
+  min-width: 80px; min-height: 18px;
+  display: inline-block;
+}
+
+.s-subtask-text:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-3);
+  pointer-events: none;
+}
+
+.s-task-title:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-3);
+  pointer-events: none;
+}
+
+.s-due-pill-inline {
+  flex-shrink: 0; font-size: 10px; font-weight: 500;
+  padding: 2px 6px; background: var(--border-soft);
+  border-radius: 10px; white-space: nowrap;
+}
+
+/* ── Task editor (expanded) ───────────────────────── */
+.s-task-editor {
+  padding: 2px 10px 10px;
+  margin-bottom: 0;
+}
+
+/* Notes shown under a collapsed task (always visible when populated) */
+.s-notes-collapsed {
+  padding: 0 10px 8px 38px;
+  margin-top: -2px;
+  font-size: 12px; color: var(--text-2);
+  white-space: pre-wrap; word-break: break-word;
+}
+
+.s-editor-body {
+  display: flex; flex-direction: column; gap: 6px;
+}
+
+.s-editor-body .s-subtasks {
+  padding-left: 28px;
+}
+
+.s-details-input {
+  border: 1px solid var(--border-soft); background: var(--bg);
+  border-radius: 4px; padding: 4px 6px;
+  font-family: var(--font); font-size: 12px;
+  color: var(--text); outline: none; resize: none;
+  min-height: 28px;
+}
+
+.s-details-input:focus {
+  border-color: var(--border);
+}
+
+.s-details-input::placeholder { color: var(--text-3); }
+
+.s-subtasks {
+  display: flex; flex-direction: column; gap: 2px;
+}
+
+.s-add-sub-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 0; margin-top: 4px;
+}
+
+.s-add-sub-input {
+  flex: 1; border: none; background: transparent;
+  font-family: var(--font); font-size: 13px;
+  color: var(--text); outline: none; padding: 0;
+}
+
+.s-add-sub-input::placeholder { color: var(--text-3); }
+
+/* ── Pills (due, park) ────────────────────────────── */
+.s-pill {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 2px 8px; border-radius: 12px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--text-3); cursor: pointer; font-size: 10.5px;
+  font-weight: 500; font-family: var(--font);
+  transition: all 100ms;
+}
+
+.s-pill:hover {
+  border-color: var(--text-2); color: var(--text-2);
+}
+
+.s-pill.is-on {
+  border-color: var(--brand); background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.s-pill.icon-only {
+  width: 22px; height: 22px; padding: 0;
+  border-radius: 50%; display: flex; align-items: center;
+  justify-content: center;
+}
+
+.s-park-pill {
+  background: rgba(245,158,11,0.08);
+  border-color: rgba(245,158,11,0.3); color: #d97706;
+}
+
+.s-park-pill.is-on {
+  background: rgba(245,158,11,0.15);
+  border-color: #d97706; color: #d97706;
+}
+
+/* Focus pill — tags a task `now` so it shows in Focus Mode.
+   Sits flush-right, immediately before Park (the two are adjacent). */
+.s-pill.focus-pill {
+  margin-left: auto;
+  border-color: var(--brand); color: var(--brand);
+}
+
+.s-pill.focus-pill.is-on {
+  background: var(--brand); border-color: var(--brand); color: #E0DEFF;
+}
+
+.s-delete-btn {
+  width: 22px; height: 22px; display: flex;
+  align-items: center; justify-content: center;
+  border-radius: 4px; border: none; background: transparent;
+  color: var(--error); cursor: pointer; transition: all 100ms;
+}
+
+.s-delete-btn:hover {
+  background: rgba(239,68,68,0.1);
+}
+
+/* ── Footer ───────────────────────────────────────────── */
+#s-footer {
+  padding: 9px 16px; border-top: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 11px; color: var(--text-3); flex-shrink: 0;
+  background: var(--surface);
+}
+
+.s-sync-status {
+  display: flex; align-items: center; gap: 4px;
+}
+
+.s-sync-status.is-synced { color: var(--success); }
+.s-sync-status.is-error { color: var(--error); }
+
+.s-date {
+  font-size: 11px; color: var(--text-3);
+}
+
+/* ══ Focus Mode ════════════════════════════════════════ */
+
+/* Focus tab — the standout first tab */
+.s-view-tab.focus-tab {
+  color: var(--brand);
+  font-weight: 600;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.s-view-tab.focus-tab.is-on {
+  color: var(--brand);
+  border-bottom-color: var(--brand);
+}
+.s-view-tab.focus-tab::before {
+  content: "";
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--brand);
+}
+
+/* `now` tag chip (dark-blue bg, light-blue text) */
+.s-now-tag {
+  flex-shrink: 0; font-size: 10px; font-weight: 600;
+  padding: 2px 8px; border-radius: 10px;
+  background: var(--brand); color: #E0DEFF;
+  white-space: nowrap;
+}
+
+/* Focus container padding */
+.s-focus {
+  padding: 14px 16px 24px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+
+/* Duration chips */
+.s-focus-chips {
+  display: flex; gap: 8px;
+}
+.s-focus-chip {
+  flex: 1; padding: 10px 8px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--bg);
+  cursor: pointer; font-family: var(--font);
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  transition: all 100ms;
+}
+.s-focus-chip:hover { border-color: var(--text-3); }
+.s-focus-chip.is-on {
+  border-color: var(--brand); background: var(--brand-soft);
+}
+.s-focus-chip-time { font-size: 14px; font-weight: 600; color: var(--text); }
+.s-focus-chip-label { font-size: 10px; color: var(--text-3); }
+.s-focus-chip.is-on .s-focus-chip-time { color: var(--brand); }
+
+/* Custom duration inputs */
+.s-focus-custom {
+  display: flex; align-items: center; gap: 8px; justify-content: center;
+  font-size: 12px; color: var(--text-2);
+}
+.s-focus-custom input {
+  width: 48px; padding: 4px 6px; border-radius: 6px;
+  border: 1px solid var(--border); font-family: var(--font);
+  font-size: 13px; text-align: center; outline: none;
+}
+.s-focus-custom input:focus { border-color: var(--brand); }
+
+/* "Add a task to focus on…" field */
+.s-focus-add {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--bg);
+}
+.s-focus-add input {
+  flex: 1; border: none; background: transparent; outline: none;
+  font-family: var(--font); font-size: 14px; color: var(--text);
+}
+.s-focus-add input::placeholder { color: var(--text-3); }
+
+/* Focus task list */
+.s-focus-list { display: flex; flex-direction: column; gap: 1px; }
+.s-focus-task {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 4px; border-radius: 8px;
+}
+.s-focus-task:hover { background: var(--bg); }
+.s-focus-task.is-done .s-focus-task-text {
+  color: var(--text-3); text-decoration: line-through;
+}
+.s-focus-task-text { flex: 1; font-size: 14px; color: var(--text); word-break: break-word; }
+.s-focus-task .s-now-tag { opacity: 0.9; }
+.s-focus-remove {
+  width: 22px; height: 22px; border: none; background: transparent;
+  color: var(--text-3); cursor: pointer; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: all 100ms;
+}
+.s-focus-task:hover .s-focus-remove { opacity: 1; }
+.s-focus-remove:hover { background: var(--border-soft); color: var(--error); }
+
+/* Start button */
+.s-focus-start {
+  padding: 12px; border-radius: 10px; border: none;
+  background: var(--brand); color: #fff; cursor: pointer;
+  font-family: var(--font); font-size: 14px; font-weight: 600;
+  transition: filter 100ms;
+}
+.s-focus-start:hover { filter: brightness(1.05); }
+.s-focus-start:disabled { background: var(--border); color: var(--text-3); cursor: default; }
+
+.s-focus-empty {
+  text-align: center; color: var(--text-3); font-size: 13px; padding: 8px 0;
+}
+
+/* ── Timer card (running / break / ended) ─────────────── */
+.s-timer-card {
+  border: 1px solid var(--border); border-radius: 14px;
+  padding: 18px 16px; display: flex; flex-direction: column; gap: 12px;
+  background: var(--bg);
+}
+.s-timer-top {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.s-timer-phase {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.6px; color: var(--brand);
+}
+.s-timer-phase.is-break { color: var(--success); }
+.s-timer-time {
+  font-size: 42px; font-weight: 700; color: var(--text);
+  letter-spacing: -0.02em; font-variant-numeric: tabular-nums;
+}
+.s-timer-meta { font-size: 12px; color: var(--text-2); }
+
+/* Progress bar */
+.s-progress {
+  height: 6px; border-radius: 3px; background: var(--surface-2);
+  overflow: hidden;
+}
+.s-progress-fill {
+  height: 100%; background: var(--brand); border-radius: 3px;
+  transition: width 1s linear;
+}
+.s-progress-fill.is-break { background: var(--success); }
+
+/* Timer controls */
+.s-timer-controls {
+  display: flex; gap: 8px;
+}
+.s-timer-btn {
+  flex: 1; padding: 9px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg);
+  cursor: pointer; font-family: var(--font); font-size: 13px;
+  font-weight: 500; color: var(--text-2); transition: all 100ms;
+}
+.s-timer-btn:hover { border-color: var(--text-3); color: var(--text); }
+.s-timer-btn.is-primary {
+  background: var(--brand); border-color: var(--brand); color: #fff;
+}
+.s-timer-btn.is-primary:hover { filter: brightness(1.05); color: #fff; }
+.s-timer-btn.is-danger:hover { border-color: var(--error); color: var(--error); }
+
+.s-pomo {
+  text-align: center; font-size: 12px; color: var(--text-3);
+}
+
+/* ── Session ended ────────────────────────────────────── */
+.s-break-btn {
+  width: 100%; padding: 11px; border-radius: 10px;
+  border: 1px solid var(--brand); background: var(--brand-soft);
+  color: var(--brand); cursor: pointer; font-family: var(--font);
+  font-size: 14px; font-weight: 600; transition: all 100ms;
+}
+.s-break-btn:hover { background: var(--brand); color: #fff; }
+
+.s-new-session-label {
+  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.6px; color: var(--text-3); text-align: center;
+  margin-top: 4px;
+}
+.s-session-opts { display: flex; gap: 8px; }
+.s-session-opt {
+  flex: 1; padding: 10px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg);
+  cursor: pointer; font-family: var(--font); font-size: 13px;
+  font-weight: 500; color: var(--text); transition: all 100ms;
+  position: relative;
+}
+.s-session-opt:hover { border-color: var(--text-3); }
+
+/* Tooltip on session options */
+.s-tip { position: relative; }
+.s-tip:hover::after {
+  content: attr(data-tip);
+  position: absolute; bottom: calc(100% + 8px); left: 50%;
+  transform: translateX(-50%);
+  background: var(--text); color: #fff;
+  padding: 6px 10px; border-radius: 6px;
+  font-size: 11px; font-weight: 400; line-height: 1.4;
+  width: 150px; text-align: center; z-index: 50;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+  pointer-events: none;
+}
+.s-tip:hover::before {
+  content: "";
+  position: absolute; bottom: calc(100% + 3px); left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent; border-top-color: var(--text);
+  z-index: 50; pointer-events: none;
+}
+
+/* ── Scrollbar ───────────────────────────────────────── */
+#s-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+#s-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#s-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+#s-list::-webkit-scrollbar-thumb:hover {
+  background: var(--text-3);
+}
+
+/* ── Reduced motion ───────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  .s-progress-fill { transition: none !important; }
+}
