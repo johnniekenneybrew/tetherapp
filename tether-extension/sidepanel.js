@@ -1,7 +1,7 @@
 // ── Config ───────────────────────────────────────────────────
 const BASE = 'https://to-tether.app/api';
 const ACCTS = [
-  { id: 'getro',    name: 'Getro/Findem',    color: '#FF9500' },
+  { id: 'findem',   name: 'Findem',           color: '#FF9500' },
   { id: 'jones',    name: 'Jones',            color: '#10B981' },
   { id: 'personal', name: 'Personal',         color: '#6366F1' },
 ];
@@ -11,7 +11,7 @@ const accName  = id => ACCTS.find(a => a.id === id)?.name  || id;
 // ── State ────────────────────────────────────────────────────
 let tasks       = [];
 let taskCreationOrder = new Map(); // maps task.id to creation timestamp for sorting
-let filter      = 'all'; // 'all' | 'getro' | 'jones' | 'personal'
+let filter      = 'all'; // 'all' | 'findem' | 'jones' | 'personal'
 let showDone    = true;
 let filterOpen  = false;
 let loading     = true;

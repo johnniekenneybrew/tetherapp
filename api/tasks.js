@@ -42,8 +42,8 @@ async function ensureProjects() {
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
 const TODAY_MS  = new Date(TODAY_ISO + "T00:00:00").getTime();
 
-// Special labels handled as booleans in the Tether model
-const SPECIAL_LABELS = new Set(["parked", "now"]);
+// Special labels handled as booleans in the Tether model (checked case-insensitively)
+const SPECIAL_LABEL_NAMES = new Set(["parked", "now"]);
 
 function isoToDue(iso) {
   if (!iso) return null;
@@ -79,16 +79,16 @@ function accountFromProjectId(projectId) {
 }
 
 function isParked(labels = []) {
-  return labels.includes("parked");
+  return labels.some(l => l.toLowerCase() === "parked");
 }
 
 function isNow(labels = []) {
-  return labels.includes("now");
+  return labels.some(l => l.toLowerCase() === "now");
 }
 
 // Non-special labels (Internal, Design, Call Follow Ups, Onboarding, etc.)
 function getTaskLabels(labels = []) {
-  return labels.filter(l => !SPECIAL_LABELS.has(l));
+  return labels.filter(l => !SPECIAL_LABEL_NAMES.has(l.toLowerCase()));
 }
 
 function toTask(t, subtasksMap = {}) {
@@ -158,9 +158,9 @@ export default async function handler(req, res) {
       const { title, account, done, priority, details, due, parentId, parked, now, labels } = req.body;
 
       const taskLabels = [];
-      if (parked) taskLabels.push("parked");
-      if (now)    taskLabels.push("now");
-      if (Array.isArray(labels)) taskLabels.push(...labels.filter(l => !SPECIAL_LABELS.has(l)));
+      if (parked) taskLabels.push("Parked");
+      if (now)    taskLabels.push("Now");
+      if (Array.isArray(labels)) taskLabels.push(...labels.filter(l => !SPECIAL_LABEL_NAMES.has(l.toLowerCase())));
 
       const payload = {
         content:     title,
@@ -216,12 +216,12 @@ export default async function handler(req, res) {
         const parked     = patch.parked  !== undefined ? patch.parked  : isParked(existing?.labels || []);
         const now        = patch.now     !== undefined ? patch.now     : isNow(existing?.labels || []);
         const userLabels = patch.labels  !== undefined
-          ? patch.labels.filter(l => !SPECIAL_LABELS.has(l))
+          ? patch.labels.filter(l => !SPECIAL_LABEL_NAMES.has(l.toLowerCase()))
           : getTaskLabels(existing?.labels || []);
 
         const newLabels = [];
-        if (parked) newLabels.push("parked");
-        if (now)    newLabels.push("now");
+        if (parked) newLabels.push("Parked");
+        if (now)    newLabels.push("Now");
         newLabels.push(...userLabels);
         updates.labels = newLabels;
       }
