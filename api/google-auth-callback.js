@@ -44,9 +44,6 @@ export default async function handler(req, res) {
     await saveRefreshToken(refresh_token);
 
     const alreadySet = !!process.env.GOOGLE_REFRESH_TOKEN;
-    if (alreadySet) {
-      return res.redirect(302, "/?google_auth=success");
-    }
 
     return res.send(`<!DOCTYPE html>
 <html>
@@ -62,17 +59,24 @@ export default async function handler(req, res) {
   button:hover { background: #5b52ee; }
   a { color: #6C63FF; font-size: 14px; }
   .note { font-size: 12px; color: #888; margin-top: 20px; }
+  .warn { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 16px; }
 </style>
 </head>
 <body>
   <h2>✓ Google Contacts connected</h2>
+  ${alreadySet ? `
+  <div class="warn">
+    A <strong>GOOGLE_REFRESH_TOKEN</strong> environment variable is already set in Vercel, and it always
+    takes priority over the token saved here. If your connection just broke, that old token is likely the
+    cause — <strong>replace it</strong> with the new one below in Vercel's environment variables, then redeploy.
+  </div>` : `
   <p>Copy this refresh token and add it as <strong>GOOGLE_REFRESH_TOKEN</strong> in your
      <a href="https://vercel.com" target="_blank">Vercel environment variables</a>.
-     Once set, the app will use it directly without touching Notion.</p>
+     Once set, the app will use it directly without touching Notion.</p>`}
   <div class="token-box" id="token">${refresh_token}</div>
   <button onclick="navigator.clipboard.writeText(document.getElementById('token').textContent).then(()=>this.textContent='Copied!')">Copy token</button>
   <a href="/">Go to app →</a>
-  <p class="note">The token is also saved to Notion as a fallback if you skip this step.</p>
+  <p class="note">The token is also saved to Notion as a fallback if no environment variable is set.</p>
 </body>
 </html>`);
   } catch (err) {
