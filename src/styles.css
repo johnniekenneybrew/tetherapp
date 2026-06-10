@@ -15,10 +15,10 @@
   --text-2: #5F6368;
   --text-3: #A0A0A0;
 
-  /* Accents — accounts */
-  --acc-findem: #3B82F6;
-  --acc-jones: #8B5CF6;
-  --acc-personal: #64748B;
+  /* Accents — accounts (match Chrome extension) */
+  --acc-findem: #FF9500;
+  --acc-jones: #10B981;
+  --acc-personal: #6366F1;
 
   /* Status */
   --success: #10B981;

@@ -1019,7 +1019,7 @@ function WamTab({ state }) {
 const APP_VERSION = versionData.version;
 const VERSION_CHANGELOG = versionData.changelog;
 
-const DEFAULT_AREA_COLORS = { findem: "#3B82F6", jones: "#8B5CF6", personal: "#64748B" };
+const DEFAULT_AREA_COLORS = { findem: "#FF9500", jones: "#10B981", personal: "#6366F1" };
 const AREA_PALETTE = ["#3B82F6", "#8B5CF6", "#64748B", "#10B981", "#F59E0B", "#EF4444", "#EC4899", "#06B6D4", "#6C63FF", "#1A1A1A"];
 
 const NOTION_DBS = [
