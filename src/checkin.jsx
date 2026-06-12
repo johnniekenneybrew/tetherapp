@@ -12,11 +12,8 @@ import { useOrder } from './useOrder';
 export function DailyCheckIn({ state, setState, navigateTo, actions }) {
   const today = TODAY;
   const yest = addDays(today, -1);
-  const yKey = yest.toISOString().slice(0, 10);
   const { ordered: habits, reorder: reorderHabits } = useOrder("habitOrder", state.habits);
   const { ordered: routines, reorder: reorderRoutines } = useOrder("routineOrder", state.routines);
-  const yestHabitStatus = state.habitLog[yKey] || {};
-  const yestRoutineStatus = state.routineLog[yKey] || {};
 
   const [dragHabitId, setDragHabitId] = useState(null);
   const [dragOverHabitId, setDragOverHabitId] = useState(null);
@@ -31,6 +28,16 @@ export function DailyCheckIn({ state, setState, navigateTo, actions }) {
   const [sectionsDone, setSectionsDone] = useState(state.checkin?.sectionsDone || {
     priorities: false, habits: false, gratitude: false, learnings: false,
   });
+
+  // Once yesterday's habits/routines are reviewed, switch this section to
+  // today's so anything already done today can be checked off live.
+  const habitsReviewed = !!sectionsDone.habits;
+  const activeDate = habitsReviewed ? today : yest;
+  const activeKey = activeDate.toISOString().slice(0, 10);
+  const activeLabel = habitsReviewed ? "Today" : "Yesterday";
+  const activeHabitStatus = state.habitLog[activeKey] || {};
+  const activeRoutineStatus = state.routineLog[activeKey] || {};
+
   const [celebrating, setCelebrating] = useState(false);
   const [showBanner, setShowBanner] = useState(!!state.checkin?.completed);
   const triggeredRef = useRef(!!state.checkin?.completed);
@@ -92,11 +99,11 @@ export function DailyCheckIn({ state, setState, navigateTo, actions }) {
     setSectionDone("priorities", true);
   };
 
-  const toggleYHabit = (habitId) => {
-    actions.toggleHabitLog(yKey, habitId);
+  const toggleActiveHabit = (habitId) => {
+    actions.toggleHabitLog(activeKey, habitId);
   };
-  const toggleYRoutine = (rid) => {
-    actions.toggleRoutineLog(yKey, rid);
+  const toggleActiveRoutine = (rid) => {
+    actions.toggleRoutineLog(activeKey, rid);
   };
 
   const setSectionDone = (key, val) => {
@@ -213,12 +220,12 @@ export function DailyCheckIn({ state, setState, navigateTo, actions }) {
             </div>
           </section>
 
-          {/* YESTERDAY'S HABITS + ROUTINES */}
+          {/* YESTERDAY'S OR TODAY'S HABITS + ROUTINES */}
           <section>
-            <SectionHead label="Update Yesterday's Habits & Routines" />
-            <div className={"card checkin-card" + (sectionsDone.habits ? " is-complete" : "")}>
+            <SectionHead label={habitsReviewed ? "Today's Habits & Routines" : "Update Yesterday's Habits & Routines"} />
+            <div className={"card checkin-card" + (habitsReviewed ? " is-complete" : "")}>
               <div className="tiny" style={{ marginBottom: 10 }}>
-                Yesterday · {fmtLong(yest)}
+                {activeLabel} · {fmtLong(activeDate)}
               </div>
 
               <div className="yh-grid">
@@ -233,12 +240,12 @@ export function DailyCheckIn({ state, setState, navigateTo, actions }) {
                         onDragOver={(e) => { e.preventDefault(); setDragOverHabitId(h.id); }}
                         onDrop={() => { reorderHabits(dragHabitId, h.id); setDragHabitId(null); setDragOverHabitId(null); }}
                         onDragEnd={() => { setDragHabitId(null); setDragOverHabitId(null); }}
-                        onClick={() => !sectionsDone.habits && toggleYHabit(h.id)}>
+                        onClick={() => toggleActiveHabit(h.id)}>
                         <span className="drag-handle" style={{ marginRight: 4 }}><Icon.Grip /></span>
                         <span style={{ fontSize: 13.5, flex: 1 }}>{h.name}</span>
                         <Checkbox
-                          checked={!!yestHabitStatus[h.id]}
-                          onChange={() => !sectionsDone.habits && toggleYHabit(h.id)}
+                          checked={!!activeHabitStatus[h.id]}
+                          onChange={() => toggleActiveHabit(h.id)}
                           size="sm"
                         />
                       </li>
@@ -256,15 +263,15 @@ export function DailyCheckIn({ state, setState, navigateTo, actions }) {
                         onDragOver={(e) => { e.preventDefault(); setDragOverRoutineId(r.id); }}
                         onDrop={() => { reorderRoutines(dragRoutineId, r.id); setDragRoutineId(null); setDragOverRoutineId(null); }}
                         onDragEnd={() => { setDragRoutineId(null); setDragOverRoutineId(null); }}
-                        onClick={() => !sectionsDone.habits && toggleYRoutine(r.id)}
+                        onClick={() => toggleActiveRoutine(r.id)}
                         title={r.name}>
                         <span className="drag-handle" style={{ marginRight: 4 }}><Icon.Grip /></span>
                         <span style={{ fontSize: r.useIcon && r.icon ? 18 : 13.5, flex: 1 }}>
                           {r.useIcon && r.icon ? r.icon : r.name}
                         </span>
                         <Checkbox
-                          checked={!!yestRoutineStatus[r.id]}
-                          onChange={() => !sectionsDone.habits && toggleYRoutine(r.id)}
+                          checked={!!activeRoutineStatus[r.id]}
+                          onChange={() => toggleActiveRoutine(r.id)}
                           size="sm"
                         />
                       </li>
@@ -274,7 +281,7 @@ export function DailyCheckIn({ state, setState, navigateTo, actions }) {
               </div>
 
               <SectionFooter
-                done={sectionsDone.habits}
+                done={habitsReviewed}
                 ready={habitsReady}
                 onMark={() => setSectionDone("habits", true)}
                 onEdit={() => setSectionDone("habits", false)}
