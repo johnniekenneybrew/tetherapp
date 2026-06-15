@@ -904,16 +904,31 @@ function focusTaskListHTML(nowTasks) {
   }
   return `
     <div class="s-focus-list">
-      ${nowTasks.map(t => `
+      ${nowTasks.map(t => {
+        const color = accColor(t.account);
+        const hasSubs = t.subtasks && t.subtasks.length > 0;
+        return `
         <div class="s-focus-task ${t.done ? 'is-done' : ''}">
-          <button class="s-check ${t.done ? 'is-checked' : ''}" style="${t.done ? `background:${accColor(t.account)}` : ''}" data-tid="${t.id}">
+          <button class="s-check ${t.done ? 'is-checked' : ''}" style="${t.done ? `background:${color}` : ''}" data-tid="${t.id}">
             ${t.done ? `<span style="color:#fff">${ICO_CHECK}</span>` : ''}
           </button>
           <span class="s-focus-task-text">${escHtml(t.title)}</span>
           <span class="s-now-tag">now</span>
           <button class="s-focus-remove" data-focus-remove="${t.id}" title="Remove from Focus">${ICO_TRASH}</button>
         </div>
-      `).join('')}
+        ${hasSubs && !t.done ? `
+        <div class="s-subtasks-inline">
+          ${t.subtasks.map(s => `
+            <div class="s-subtask ${s.done ? 'is-done' : ''}">
+              <button class="s-subtask-check ${s.done ? 'is-checked' : ''}" style="${s.done ? `background:${color}` : ''}" data-sub="${s.id}" data-tid="${t.id}">
+                ${s.done ? `<span style="color:#fff">${ICO_CHECK}</span>` : ''}
+              </button>
+              <span class="s-subtask-text-inline" contenteditable="plaintext-only" data-sub-text="${s.id}" data-sub-tid="${t.id}" data-placeholder="Subtask" spellcheck="false">${escHtml(s.text)}</span>
+            </div>
+          `).join('')}
+        </div>` : ''}
+      `;
+      }).join('')}
     </div>`;
 }
 

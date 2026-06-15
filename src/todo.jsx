@@ -555,20 +555,38 @@ function FocusView({ todos, actions }) {
       {nowTasks.length === 0 ? (
         <div className="tdx-focus-empty">No focus tasks yet — add one below.</div>
       ) : nowTasks.map((t) => (
-        <div key={t.id} className={'tdx-focus-task' + (t.done ? ' is-done' : '')}>
-          <button
-            type="button"
-            className={'tdx-check' + (t.done ? ' is-checked' : '')}
-            data-acc={t.account}
-            onClick={() => actions.toggleDone(t.id)}>
-            <Icon.Check />
-          </button>
-          <span className="tdx-focus-task-text">{t.title}</span>
-          <button className="tdx-focus-remove" title="Remove from Focus"
-            onClick={() => actions.updateTodo(t.id, { now: false })}>
-            <Icon.X />
-          </button>
-        </div>
+        <React.Fragment key={t.id}>
+          <div className={'tdx-focus-task' + (t.done ? ' is-done' : '')}>
+            <button
+              type="button"
+              className={'tdx-check' + (t.done ? ' is-checked' : '')}
+              data-acc={t.account}
+              onClick={() => actions.toggleDone(t.id)}>
+              <Icon.Check />
+            </button>
+            <span className="tdx-focus-task-text">{t.title}</span>
+            <button className="tdx-focus-remove" title="Remove from Focus"
+              onClick={() => actions.updateTodo(t.id, { now: false })}>
+              <Icon.X />
+            </button>
+          </div>
+          {!t.done && t.subtasks?.length > 0 && (
+            <div className="tdx-subs-inline">
+              {t.subtasks.map((s) => (
+                <div key={s.id} className={'tdx-sub-inline' + (s.done ? ' is-done' : '')}>
+                  <button
+                    type="button"
+                    className={'tdx-check tdx-check-sm' + (s.done ? ' is-checked' : '')}
+                    data-acc={t.account}
+                    onClick={() => actions.toggleSubtask(t.id, s.id)}>
+                    <Icon.Check />
+                  </button>
+                  <span className="tdx-sub-inline-text">{s.text}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </React.Fragment>
       ))}
     </div>
   );
