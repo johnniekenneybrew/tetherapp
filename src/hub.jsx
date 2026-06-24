@@ -1132,72 +1132,83 @@ const NOTION_DBS = [
 // NFC Tags
 // ============================================================
 
-const NFC_STEPS = [
-  {
-    n: 1,
-    title: "Enable an item",
-    body: "Toggle on any habit or routine below. A unique tap URL will appear beneath it.",
-  },
-  {
-    n: 2,
-    title: "Copy the URL",
-    body: "Tap \"Copy URL\" next to the item you want to track.",
-  },
-  {
-    n: 3,
-    title: "Download NFC Tools",
-    body: "Install the free \"NFC Tools\" app from the App Store (iOS) or Google Play (Android).",
-  },
-  {
-    n: 4,
-    title: "Write the URL to a tag",
-    body: "Open NFC Tools → Write → Add a record → URL. Paste your copied URL, then tap \"Write\" and hold an NFC tag to the back of your phone.",
-  },
-  {
-    n: 5,
-    title: "Place the tag",
-    body: "Stick or tape the NFC tag near the item — e.g. on your toothbrush holder, inside the shower, or anywhere you'll naturally tap your phone.",
-  },
-  {
-    n: 6,
-    title: "Tap to log",
-    body: "Hold your phone near the tag. iOS opens a Safari page that instantly marks the item as done for today in Notion. No app needs to be open.",
-  },
-];
+function NfcSetupModal({ onClose, url, itemName }) {
+  const [copied, setCopied] = useState(false);
 
-function NfcSetupModal({ onClose }) {
+  const copy = () => {
+    navigator.clipboard.writeText(url).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
+
+  const steps = [
+    {
+      n: 1,
+      title: "Copy this URL",
+      body: (
+        <div style={{ marginTop: 8 }}>
+          <div style={{
+            fontSize: 11, fontFamily: "var(--mono)", color: "var(--text-2)",
+            background: "var(--surface-2)", border: "1px solid var(--border)",
+            borderRadius: 6, padding: "8px 10px",
+            wordBreak: "break-all", lineHeight: 1.5, marginBottom: 8,
+          }}>
+            {url}
+          </div>
+          <button className="btn btn-primary" style={{ width: "100%" }} onClick={copy}>
+            {copied ? "Copied ✓" : "Copy URL"}
+          </button>
+        </div>
+      ),
+    },
+    {
+      n: 2,
+      title: "Open NFC Tools",
+      body: "Write → Add a record → URL. Paste the URL, tap Write, then hold an NFC tag to the back of your phone.",
+    },
+    {
+      n: 3,
+      title: "Place the tag",
+      body: "Stick it near the item — your toothbrush holder, the shower wall, etc.",
+    },
+    {
+      n: 4,
+      title: "Tap to log",
+      body: "Hold your phone to the tag. Safari opens and logs it as done for today.",
+    },
+  ];
+
   return (
     <div className="modal-back" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
-          <h3 style={{ margin: 0 }}>NFC Tag Setup Guide</h3>
-          <button onClick={onClose} style={{ fontSize: 20, color: "var(--text-3)", lineHeight: 1, padding: "2px 4px" }}>×</button>
+      <div className="modal" style={{ maxWidth: 400, maxHeight: "85vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 16 }}>Set up NFC tag</h3>
+            <div className="tiny" style={{ color: "var(--text-3)", marginTop: 2 }}>{itemName}</div>
+          </div>
+          <button onClick={onClose} style={{ fontSize: 22, color: "var(--text-3)", lineHeight: 1, padding: "2px 6px" }}>×</button>
         </div>
-        <p className="tiny" style={{ color: "var(--text-2)", marginBottom: 20 }}>
-          Follow these steps to write a tap URL to a physical NFC tag.
-        </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {NFC_STEPS.map((step) => (
-            <div key={step.n} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {steps.map((step) => (
+            <div key={step.n} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
               <span style={{
-                width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
+                width: 24, height: 24, borderRadius: "50%", flexShrink: 0,
                 background: "#6C63FF", color: "#fff",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 12, fontWeight: 700,
+                fontSize: 11, fontWeight: 700, marginTop: 1,
               }}>{step.n}</span>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 3 }}>{step.title}</div>
-                <div className="tiny" style={{ color: "var(--text-2)", lineHeight: 1.55 }}>{step.body}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>{step.title}</div>
+                {typeof step.body === "string" ? (
+                  <div className="tiny" style={{ color: "var(--text-2)", marginTop: 2, lineHeight: 1.5 }}>{step.body}</div>
+                ) : step.body}
               </div>
             </div>
           ))}
         </div>
-        <div style={{ marginTop: 24, padding: "12px 14px", background: "var(--tint-blue)", borderRadius: 8 }}>
-          <div className="tiny" style={{ color: "var(--text-2)", lineHeight: 1.55 }}>
-            <strong>Tip:</strong> If you regenerate your token in Settings, any previously written NFC tags will stop working. You'll need to re-copy the new URLs and re-write them to your tags.
-          </div>
-        </div>
-        <button className="btn btn-primary" style={{ marginTop: 18, width: "100%" }} onClick={onClose}>Got it</button>
+
+        <button className="btn" style={{ marginTop: 20, width: "100%" }} onClick={onClose}>Done</button>
       </div>
     </div>
   );
@@ -1211,7 +1222,7 @@ function NfcTagsSection({ state }) {
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
   const [copied, setCopied] = useState(null);
-  const [showGuide, setShowGuide] = useState(false);
+  const [showGuide, setShowGuide] = useState(null); // null | { url, itemName }
 
   useEffect(() => {
     if (!uid) return;
@@ -1242,7 +1253,10 @@ function NfcTagsSection({ state }) {
       : nfcItems.filter((i) => !(i.type === type && i.id === id));
     setNfcItems(next);
     nfcApi.saveItems(uid, next).catch(console.error);
-    if (enabling) setShowGuide(true);
+    if (enabling) {
+      const url = `${window.location.origin}/api/nfc?tap=1&type=${type}&id=${id}&uid=${encodeURIComponent(uid)}&token=${token}`;
+      setShowGuide({ url, itemName: name });
+    }
   };
 
   const regenerate = async () => {
@@ -1271,7 +1285,7 @@ function NfcTagsSection({ state }) {
 
   return (
     <div>
-      {showGuide && <NfcSetupModal onClose={() => setShowGuide(false)} />}
+      {showGuide && <NfcSetupModal onClose={() => setShowGuide(null)} url={showGuide.url} itemName={showGuide.itemName} />}
       <div className="card" style={{ padding: "4px 0" }}>
         {allItems.length === 0 && (
           <div style={{ padding: "16px 20px" }} className="tiny">No active habits or routines found.</div>
@@ -1336,11 +1350,19 @@ function NfcTagsSection({ state }) {
       </div>
 
       <div style={{ marginTop: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <button
-          onClick={() => setShowGuide(true)}
-          style={{ fontSize: 12, color: "#6C63FF", background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 500 }}>
-          How to set up NFC tags →
-        </button>
+        {nfcItems.length > 0 ? (
+          <button
+            onClick={() => {
+              const first = nfcItems[0];
+              const url = tapUrl(first.type, first.id);
+              if (url) setShowGuide({ url, itemName: first.name });
+            }}
+            style={{ fontSize: 12, color: "#6C63FF", background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 500 }}>
+            How to set up NFC tags →
+          </button>
+        ) : (
+          <span className="tiny" style={{ color: "var(--text-3)" }}>Toggle an item to get started</span>
+        )}
         {nfcToken && (
           <button className="btn btn-sm" onClick={regenerate} disabled={regenerating}
             style={{ flexShrink: 0, marginLeft: 12 }}>
