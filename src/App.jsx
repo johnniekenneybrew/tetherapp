@@ -8,6 +8,84 @@ import { SocialPage } from './social';
 import { useAppData } from './useAppData';
 
 // ============================================================
+// Pull-to-refresh (PWA / iOS home screen)
+// ============================================================
+
+const PTR_THRESHOLD = 72; // px of pull needed to trigger reload
+
+function PullToRefresh() {
+  const [pullY, setPullY] = useState(0);
+  const startYRef = useRef(0);
+  const activeRef = useRef(false);
+
+  useEffect(() => {
+    const onStart = (e) => {
+      if (window.scrollY === 0) {
+        startYRef.current = e.touches[0].clientY;
+        activeRef.current = true;
+      }
+    };
+    const onMove = (e) => {
+      if (!activeRef.current) return;
+      const dy = e.touches[0].clientY - startYRef.current;
+      setPullY(dy > 0 ? Math.min(dy, PTR_THRESHOLD * 1.4) : 0);
+    };
+    const onEnd = () => {
+      if (!activeRef.current) return;
+      activeRef.current = false;
+      setPullY((prev) => {
+        if (prev >= PTR_THRESHOLD) {
+          setTimeout(() => window.location.reload(), 100);
+          return PTR_THRESHOLD; // hold until reload
+        }
+        return 0;
+      });
+    };
+    document.addEventListener("touchstart", onStart, { passive: true });
+    document.addEventListener("touchmove", onMove, { passive: true });
+    document.addEventListener("touchend", onEnd);
+    return () => {
+      document.removeEventListener("touchstart", onStart);
+      document.removeEventListener("touchmove", onMove);
+      document.removeEventListener("touchend", onEnd);
+    };
+  }, []);
+
+  if (pullY < 6) return null;
+  const ready = pullY >= PTR_THRESHOLD;
+  const rotate = Math.min(180, (pullY / PTR_THRESHOLD) * 180);
+
+  return (
+    <div style={{
+      position: "fixed", top: 0, left: 0, right: 0, zIndex: 9999,
+      display: "flex", justifyContent: "center",
+      transform: `translateY(${Math.min(pullY - 20, 52)}px)`,
+      transition: pullY === 0 ? "transform 0.2s ease" : "none",
+      pointerEvents: "none",
+    }}>
+      <div style={{
+        width: 36, height: 36, borderRadius: "50%",
+        background: "var(--bg)", border: "1px solid var(--border)",
+        boxShadow: "var(--shadow-sm)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        color: ready ? "#6C63FF" : "var(--text-3)",
+        transition: "color 0.15s",
+      }}>
+        {ready ? (
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ animation: "ptr-spin 0.6s linear infinite" }}>
+            <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.8" strokeDasharray="28" strokeDashoffset="8" strokeLinecap="round"/>
+          </svg>
+        ) : (
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ transform: `rotate(${rotate}deg)`, transition: "transform 0.05s" }}>
+            <path d="M7 2v8M7 10l-3-3M7 10l3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // App
 // ============================================================
 
@@ -84,6 +162,7 @@ function AuthedApp() {
 
   return (
     <div className="app">
+      <PullToRefresh />
       {toast && (
         <div className="toast">
           <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
