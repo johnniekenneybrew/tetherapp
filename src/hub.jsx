@@ -1150,8 +1150,8 @@ function NfcTagsSection({ state }) {
   }, [uid]);
 
   const allItems = [
-    ...(state.routines || []).filter((r) => r.active).map((r) => ({ type: "routine", id: r.id, name: r.name, icon: r.useIcon ? r.icon : null })),
-    ...(state.habits || []).filter((h) => h.active).map((h) => ({ type: "habit", id: h.id, name: h.name, icon: null })),
+    ...(state.routines || []).map((r) => ({ type: "routine", id: r.id, name: r.name, icon: r.useIcon ? r.icon : null })),
+    ...(state.habits || []).map((h) => ({ type: "habit", id: h.id, name: h.name, icon: null })),
   ];
 
   const isEnabled = (type, id) => nfcItems.some((i) => i.type === type && i.id === id);
