@@ -40,7 +40,13 @@ Full backend migration from Notion → Supabase. All 14 files committed and push
 
 ## What Still Needs To Be Done
 
-### Step 1 — Apply the schema in Supabase (use the Supabase MCP connector)
+### Step 1 — Apply the schema in Supabase (use the Supabase MCP connector) ✅ DONE
+
+Applied to project `lgaqgneewiqnljcoxbhn` on 2026-06-24 via the Supabase MCP
+connector as migration `20260624135248_init_tether_schema`. All 9 tables,
+indexes, FK constraints, and the 4 UNIQUE constraints (`habit_log` habit_id+log_date,
+`routine_log` routine_id+log_date, `checkins` user_id+date, `prefs` user_id+key)
+are verified present. RLS remains disabled by design (service_role key bypasses it).
 
 Run the contents of `supabase-schema.sql` against the project.
 
