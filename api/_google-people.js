@@ -7,22 +7,32 @@ const PEOPLE_API    = "https://people.googleapis.com/v1";
 let _accessToken  = null;
 let _tokenExpiry  = 0;
 let _refreshToken = null;
+// Set true when the current token fails with invalid_grant so we stop
+// re-trying the same bad token (including the env var) within this process.
+let _tokenInvalid = false;
 
 export async function getRefreshToken() {
-  if (process.env.GOOGLE_REFRESH_TOKEN) return process.env.GOOGLE_REFRESH_TOKEN;
+  if (_tokenInvalid) return null;
+  // In-memory first (populated by saveRefreshToken or loaded below)
   if (_refreshToken) return _refreshToken;
-  _refreshToken = await getPref("google-refresh-token", "_system");
-  return _refreshToken;
+  // Notion next — re-auth saves here, and it should beat the env var
+  const saved = await getPref("google-refresh-token", "_system");
+  if (saved) { _refreshToken = saved; return _refreshToken; }
+  // Env var as last resort (initial setup before any re-auth)
+  if (process.env.GOOGLE_REFRESH_TOKEN) return process.env.GOOGLE_REFRESH_TOKEN;
+  return null;
 }
 
 export async function saveRefreshToken(token) {
   _refreshToken = token;
+  _tokenInvalid = false;
   await setPref("google-refresh-token", token, "_system");
 }
 
 export async function clearRefreshToken() {
   _refreshToken = null;
   _accessToken  = null;
+  _tokenInvalid = true; // stop using env var too for this process lifetime
   await setPref("google-refresh-token", null, "_system");
 }
 
@@ -48,9 +58,13 @@ async function getAccessToken() {
   });
 
   if (!res.ok) {
-    const err = await res.text();
-    if (res.status === 400) { await clearRefreshToken(); }
-    throw new Error(`Token refresh failed: ${err}`);
+    const body = await res.json().catch(() => ({}));
+    // Only clear the token on confirmed revocation — not on transient errors
+    if (body.error === "invalid_grant") {
+      await clearRefreshToken();
+      throw new Error("Google token revoked — please reconnect in Settings");
+    }
+    throw new Error(`Token refresh failed: ${body.error || res.status}`);
   }
 
   const data = await res.json();
