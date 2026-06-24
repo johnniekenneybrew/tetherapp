@@ -14,6 +14,28 @@ export function HabitsHub({ state, setState, sub, setSub, actions }) {
   const tabs = [
     { id: "habits", label: "Habits" },
     { id: "routines", label: "Routines" },
+  ];
+  return (
+    <div className="page fade-in">
+      <h1 className="page-title">Habits &amp; Routines</h1>
+      <p className="page-sub">Build consistency — track daily habits and non-negotiable routines.</p>
+
+      <div className="subtabs">
+        {tabs.map((t) => (
+          <button key={t.id} className={sub === t.id ? "active" : ""} onClick={() => setSub(t.id)}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {sub === "habits" && <HabitsTab state={state} setState={setState} actions={actions} />}
+      {sub === "routines" && <RoutinesTab state={state} setState={setState} actions={actions} />}
+    </div>
+  );
+}
+
+export function PlansHub({ state, setState, sub, setSub, actions }) {
+  const tabs = [
     { id: "goals", label: "Goals" },
     { id: "wam", label: "WAM" },
   ];
@@ -26,10 +48,10 @@ export function HabitsHub({ state, setState, sub, setSub, actions }) {
   return (
     <div className="page fade-in">
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
-        <h1 className="page-title">Habits + Health</h1>
+        <h1 className="page-title">Plans &amp; Goals</h1>
         <span className="tiny">{quarterLabel}</span>
       </div>
-      <p className="page-sub">Track habits, build routines, and watch quarterly goals move.</p>
+      <p className="page-sub">Set quarterly goals, track weekly progress, and watch momentum build.</p>
 
       <div className="subtabs">
         {tabs.map((t) => (
@@ -39,8 +61,6 @@ export function HabitsHub({ state, setState, sub, setSub, actions }) {
         ))}
       </div>
 
-      {sub === "habits" && <HabitsTab state={state} setState={setState} actions={actions} />}
-      {sub === "routines" && <RoutinesTab state={state} setState={setState} actions={actions} />}
       {sub === "goals" && <GoalsTab state={state} setState={setState} actions={actions} />}
       {sub === "wam" && <WamTab state={state} setState={setState} />}
     </div>

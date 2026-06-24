@@ -167,7 +167,7 @@ export function EmojiRain({ duration = 4200, count = 260, onDone }) {
 
 // ----------- Top bar -----------
 
-export function TopBar({ route, setRoute, dateLabel, onHubTab }) {
+export function TopBar({ route, setRoute, dateLabel, onHubTab, onPlansTab }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropOpen, setDropOpen] = useState(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -183,7 +183,8 @@ export function TopBar({ route, setRoute, dateLabel, onHubTab }) {
 
   const items = [
     { id: "checkin", label: "Daily Check-In" },
-    { id: "hub", label: "Habits + Health", dropdown: true },
+    { id: "hub", label: "Habits & Routines", dropdown: true },
+    { id: "plans", label: "Plans & Goals", dropdown: true },
     { id: "social", label: "Social", dropdown: true },
   ];
 
@@ -194,6 +195,9 @@ export function TopBar({ route, setRoute, dateLabel, onHubTab }) {
   const hubTabs = [
     { id: "habits", label: "Habits" },
     { id: "routines", label: "Routines" },
+  ];
+
+  const plansTabs = [
     { id: "goals", label: "Goals" },
     { id: "wam", label: "WAM" },
   ];
@@ -204,7 +208,8 @@ export function TopBar({ route, setRoute, dateLabel, onHubTab }) {
 
   const allNavItems = [
     { id: "checkin", label: "Daily Check-In" },
-    { id: "hub", label: "Habits + Health" },
+    { id: "hub", label: "Habits & Routines" },
+    { id: "plans", label: "Plans & Goals" },
     { id: "social", label: "Social" },
     { id: "todo", label: "To-Do List" },
   ];
@@ -273,8 +278,9 @@ export function TopBar({ route, setRoute, dateLabel, onHubTab }) {
         <nav className="nav">
           {items.map((it) => {
             const isDropdown = it.dropdown;
-            const tabs = it.id === "hub" ? hubTabs : it.id === "social" ? socialTabs : [];
+            const tabs = it.id === "hub" ? hubTabs : it.id === "plans" ? plansTabs : it.id === "social" ? socialTabs : [];
             const isOpen = dropOpen === it.id;
+            const tabState = it.id === "hub" ? onHubTab : it.id === "plans" ? onPlansTab : null;
 
             if (isDropdown) {
               return (
@@ -290,13 +296,13 @@ export function TopBar({ route, setRoute, dateLabel, onHubTab }) {
                   {isOpen && (
                     <div className="hub-dropdown fade-in">
                       {tabs.map((tab) => {
-                        const active = it.id === "hub" && onHubTab?.current === tab.id;
+                        const active = tabState?.current === tab.id;
                         return (
                           <button key={tab.id}
                             className={"hub-dropdown-item" + (active ? " is-active" : "")}
                             onClick={() => {
                               setRoute({ page: it.id });
-                              if (it.id === "hub" && onHubTab?.set) onHubTab.set(tab.id);
+                              if (tabState?.set) tabState.set(tab.id);
                             }}>
                             {tab.label}
                           </button>

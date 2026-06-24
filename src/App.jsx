@@ -3,7 +3,7 @@ import { SignIn, SignedIn, SignedOut } from '@clerk/clerk-react';
 import { ACCOUNTS, TODAY, fmtShort, TopBar, _registerToastHandler } from './shared';
 import { DailyCheckIn } from './checkin';
 import { TodoList } from './todo';
-import { HabitsHub, SettingsTab } from './hub';
+import { HabitsHub, PlansHub, SettingsTab } from './hub';
 import { SocialPage } from './social';
 import { useAppData } from './useAppData';
 
@@ -17,6 +17,7 @@ function AuthedApp() {
   const { state, setState, loading, error, actions } = useAppData();
   const [route, setRoute] = useState({ page: "checkin" });
   const [hubSub, setHubSub] = useState("habits");
+  const [plansSub, setPlansSub] = useState("goals");
   const [toast, setToast] = useState(null);
   const toastTimer = useRef(null);
 
@@ -91,7 +92,7 @@ function AuthedApp() {
           {toast}
         </div>
       )}
-      <TopBar route={route} setRoute={setRoute} dateLabel={dateLabel} onHubTab={{ current: hubSub, set: setHubSub }} />
+      <TopBar route={route} setRoute={setRoute} dateLabel={dateLabel} onHubTab={{ current: hubSub, set: setHubSub }} onPlansTab={{ current: plansSub, set: setPlansSub }} />
       {route.page === "checkin" && (
         <DailyCheckIn state={state} setState={setState} navigateTo={navigateTo} actions={actions} />
       )}
@@ -100,6 +101,9 @@ function AuthedApp() {
       )}
       {route.page === "hub" && (
         <HabitsHub state={state} setState={setState} sub={hubSub} setSub={setHubSub} actions={actions} />
+      )}
+      {route.page === "plans" && (
+        <PlansHub state={state} setState={setState} sub={plansSub} setSub={setPlansSub} actions={actions} />
       )}
       {route.page === "settings" && (
         <div className="page fade-in">
