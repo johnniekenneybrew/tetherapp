@@ -105,3 +105,20 @@ CREATE TABLE IF NOT EXISTS prefs (
   UNIQUE(user_id, key)
 );
 CREATE INDEX IF NOT EXISTS prefs_user_key_idx ON prefs(user_id, key);
+
+-- ── Row Level Security ───────────────────────────────────────────────────────
+-- RLS is enabled on every table with NO policies, on purpose. The app
+-- authenticates with Clerk (not Supabase Auth), and the API talks to Postgres
+-- with the service_role key, which bypasses RLS. Enabling RLS with no policies
+-- denies the anon/authenticated roles all access — closing direct anon-key
+-- reads/writes — while the server keeps full access. Do not add auth.uid()
+-- policies unless client-side Supabase calls (with Clerk↔Supabase JWTs) are added.
+ALTER TABLE habits           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE habit_log        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE routines         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE routine_log      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE goals            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE goal_habit_links ENABLE ROW LEVEL SECURITY;
+ALTER TABLE goal_tasks       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE checkins         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE prefs            ENABLE ROW LEVEL SECURITY;
