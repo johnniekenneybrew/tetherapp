@@ -1132,6 +1132,77 @@ const NOTION_DBS = [
 // NFC Tags
 // ============================================================
 
+const NFC_STEPS = [
+  {
+    n: 1,
+    title: "Enable an item",
+    body: "Toggle on any habit or routine below. A unique tap URL will appear beneath it.",
+  },
+  {
+    n: 2,
+    title: "Copy the URL",
+    body: "Tap \"Copy URL\" next to the item you want to track.",
+  },
+  {
+    n: 3,
+    title: "Download NFC Tools",
+    body: "Install the free \"NFC Tools\" app from the App Store (iOS) or Google Play (Android).",
+  },
+  {
+    n: 4,
+    title: "Write the URL to a tag",
+    body: "Open NFC Tools → Write → Add a record → URL. Paste your copied URL, then tap \"Write\" and hold an NFC tag to the back of your phone.",
+  },
+  {
+    n: 5,
+    title: "Place the tag",
+    body: "Stick or tape the NFC tag near the item — e.g. on your toothbrush holder, inside the shower, or anywhere you'll naturally tap your phone.",
+  },
+  {
+    n: 6,
+    title: "Tap to log",
+    body: "Hold your phone near the tag. iOS opens a Safari page that instantly marks the item as done for today in Notion. No app needs to be open.",
+  },
+];
+
+function NfcSetupModal({ onClose }) {
+  return (
+    <div className="modal-back" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+          <h3 style={{ margin: 0 }}>NFC Tag Setup Guide</h3>
+          <button onClick={onClose} style={{ fontSize: 20, color: "var(--text-3)", lineHeight: 1, padding: "2px 4px" }}>×</button>
+        </div>
+        <p className="tiny" style={{ color: "var(--text-2)", marginBottom: 20 }}>
+          Follow these steps to write a tap URL to a physical NFC tag.
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {NFC_STEPS.map((step) => (
+            <div key={step.n} style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+              <span style={{
+                width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
+                background: "#6C63FF", color: "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 12, fontWeight: 700,
+              }}>{step.n}</span>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 3 }}>{step.title}</div>
+                <div className="tiny" style={{ color: "var(--text-2)", lineHeight: 1.55 }}>{step.body}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 24, padding: "12px 14px", background: "var(--tint-blue)", borderRadius: 8 }}>
+          <div className="tiny" style={{ color: "var(--text-2)", lineHeight: 1.55 }}>
+            <strong>Tip:</strong> If you regenerate your token in Settings, any previously written NFC tags will stop working. You'll need to re-copy the new URLs and re-write them to your tags.
+          </div>
+        </div>
+        <button className="btn btn-primary" style={{ marginTop: 18, width: "100%" }} onClick={onClose}>Got it</button>
+      </div>
+    </div>
+  );
+}
+
 function NfcTagsSection({ state }) {
   const { user } = useUser();
   const uid = user?.id;
@@ -1140,6 +1211,7 @@ function NfcTagsSection({ state }) {
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
   const [copied, setCopied] = useState(null);
+  const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
     if (!uid) return;
@@ -1164,11 +1236,13 @@ function NfcTagsSection({ state }) {
       token = result.token;
       setNfcToken(token);
     }
-    const next = isEnabled(type, id)
-      ? nfcItems.filter((i) => !(i.type === type && i.id === id))
-      : [...nfcItems, { type, id, name, ...(icon ? { icon } : {}) }];
+    const enabling = !isEnabled(type, id);
+    const next = enabling
+      ? [...nfcItems, { type, id, name, ...(icon ? { icon } : {}) }]
+      : nfcItems.filter((i) => !(i.type === type && i.id === id));
     setNfcItems(next);
     nfcApi.saveItems(uid, next).catch(console.error);
+    if (enabling) setShowGuide(true);
   };
 
   const regenerate = async () => {
@@ -1197,6 +1271,7 @@ function NfcTagsSection({ state }) {
 
   return (
     <div>
+      {showGuide && <NfcSetupModal onClose={() => setShowGuide(false)} />}
       <div className="card" style={{ padding: "4px 0" }}>
         {allItems.length === 0 && (
           <div style={{ padding: "16px 20px" }} className="tiny">No active habits or routines found.</div>
@@ -1260,17 +1335,19 @@ function NfcTagsSection({ state }) {
         })}
       </div>
 
-      {nfcToken && (
-        <div style={{ marginTop: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <p className="tiny" style={{ color: "var(--text-3)", margin: 0 }}>
-            Write each URL to an NFC tag with the NFC Tools app.
-          </p>
+      <div style={{ marginTop: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <button
+          onClick={() => setShowGuide(true)}
+          style={{ fontSize: 12, color: "#6C63FF", background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 500 }}>
+          How to set up NFC tags →
+        </button>
+        {nfcToken && (
           <button className="btn btn-sm" onClick={regenerate} disabled={regenerating}
             style={{ flexShrink: 0, marginLeft: 12 }}>
             {regenerating ? "…" : "Reset token"}
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -1343,9 +1420,6 @@ export function SettingsTab({ state, setState }) {
 
       {/* NFC Tags */}
       <h3 className="section-title" style={{ marginTop: 32 }}>NFC Tags</h3>
-      <p className="tiny" style={{ marginBottom: 14, color: "var(--text-3)" }}>
-        Enable habits or routines for NFC tracking. Copy the URL to an NFC tag — tapping it logs the item as done for today.
-      </p>
       <NfcTagsSection state={state} />
 
       {/* Version & Updates */}
