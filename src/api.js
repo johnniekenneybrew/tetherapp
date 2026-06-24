@@ -136,3 +136,12 @@ export const prefsApi = {
   get: (key, userId) => get("/prefs", { key, userId }),
   set: (key, value, userId) => post("/prefs", { key, value, userId }),
 };
+
+// ============================================================
+// NFC Tags
+// ============================================================
+export const nfcApi = {
+  getSettings: (uid)        => get("/nfc", { uid }),
+  regenerate:  (uid)        => post("/nfc", { uid, action: "regenerate" }),
+  saveItems:   (uid, items) => post("/nfc", { uid, items }),
+};

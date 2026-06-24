@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useUser } from '@clerk/clerk-react';
 import {
   ACCOUNTS, TODAY, fmtShort, fmtMD, addDays, weekStart, sameDay, DAYS, MONTHS,
   Checkbox, AccountDot, StatusBadge, Icon,
 } from './shared';
 import { useOrder } from './useOrder';
+import { nfcApi } from './api';
 import versionData from '../version.json';
 
 // ============================================================
@@ -1126,6 +1128,157 @@ const NOTION_DBS = [
   { name: "Contact Notes",   id: "c02a9437" },
 ];
 
+// ============================================================
+// NFC Tags
+// ============================================================
+
+function NfcTagsSection({ state }) {
+  const { user } = useUser();
+  const uid = user?.id;
+  const [nfcToken, setNfcToken] = useState(null);
+  const [nfcItems, setNfcItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [regenerating, setRegenerating] = useState(false);
+  const [copied, setCopied] = useState(null);
+
+  useEffect(() => {
+    if (!uid) return;
+    nfcApi.getSettings(uid).then(({ token, items }) => {
+      setNfcToken(token);
+      setNfcItems(items || []);
+    }).catch(console.error).finally(() => setLoading(false));
+  }, [uid]);
+
+  const allItems = [
+    ...(state.routines || []).filter((r) => r.active).map((r) => ({ type: "routine", id: r.id, name: r.name, icon: r.useIcon ? r.icon : null })),
+    ...(state.habits || []).filter((h) => h.active).map((h) => ({ type: "habit", id: h.id, name: h.name, icon: null })),
+  ];
+
+  const isEnabled = (type, id) => nfcItems.some((i) => i.type === type && i.id === id);
+
+  const toggle = async (type, id, name, icon) => {
+    let token = nfcToken;
+    if (!token) {
+      const result = await nfcApi.regenerate(uid).catch(console.error);
+      if (!result) return;
+      token = result.token;
+      setNfcToken(token);
+    }
+    const next = isEnabled(type, id)
+      ? nfcItems.filter((i) => !(i.type === type && i.id === id))
+      : [...nfcItems, { type, id, name, ...(icon ? { icon } : {}) }];
+    setNfcItems(next);
+    nfcApi.saveItems(uid, next).catch(console.error);
+  };
+
+  const regenerate = async () => {
+    if (regenerating) return;
+    setRegenerating(true);
+    const result = await nfcApi.regenerate(uid).catch(console.error);
+    setRegenerating(false);
+    if (result) setNfcToken(result.token);
+  };
+
+  const tapUrl = (type, id) => {
+    if (!nfcToken || !uid) return null;
+    const base = window.location.origin;
+    return `${base}/api/nfc?tap=1&type=${type}&id=${id}&uid=${encodeURIComponent(uid)}&token=${nfcToken}`;
+  };
+
+  const copyUrl = (url, key) => {
+    navigator.clipboard.writeText(url).catch(() => {});
+    setCopied(key);
+    setTimeout(() => setCopied(null), 1800);
+  };
+
+  if (loading) {
+    return <div className="tiny" style={{ color: "var(--text-3)", padding: "8px 0" }}>Loading…</div>;
+  }
+
+  return (
+    <div>
+      <div className="card" style={{ padding: "4px 0" }}>
+        {allItems.length === 0 && (
+          <div style={{ padding: "16px 20px" }} className="tiny">No active habits or routines found.</div>
+        )}
+        {allItems.map((item, i) => {
+          const enabled = isEnabled(item.type, item.id);
+          const url = enabled ? tapUrl(item.type, item.id) : null;
+          const key = `${item.type}-${item.id}`;
+          return (
+            <div key={key} style={{
+              padding: "13px 20px",
+              borderBottom: i < allItems.length - 1 ? "1px solid var(--border-soft)" : "none",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {item.icon ? (
+                  <span style={{ fontSize: 20, width: 26, textAlign: "center", flexShrink: 0 }}>{item.icon}</span>
+                ) : (
+                  <span style={{ width: 26, height: 26, flexShrink: 0, borderRadius: 6, background: "var(--surface-2)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+                    <span style={{ fontSize: 10, color: "var(--text-3)", fontWeight: 700, textTransform: "uppercase" }}>{item.type[0]}</span>
+                  </span>
+                )}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 500, fontSize: 14, color: "var(--text)" }}>{item.name}</div>
+                  <div className="tiny" style={{ color: "var(--text-3)", textTransform: "capitalize" }}>{item.type}</div>
+                </div>
+                <button
+                  onClick={() => toggle(item.type, item.id, item.name, item.icon)}
+                  aria-label={enabled ? "Disable NFC" : "Enable NFC"}
+                  style={{
+                    width: 40, height: 24, borderRadius: 12, padding: 0,
+                    background: enabled ? "#6C63FF" : "var(--surface-2)",
+                    border: enabled ? "none" : "1px solid var(--border)",
+                    transition: "background 0.15s, border 0.15s",
+                    position: "relative", flexShrink: 0, cursor: "pointer",
+                  }}>
+                  <span style={{
+                    position: "absolute", top: 4, left: enabled ? 20 : 3,
+                    width: 16, height: 16, borderRadius: "50%",
+                    background: enabled ? "#fff" : "var(--text-3)",
+                    transition: "left 0.15s, background 0.15s", display: "block",
+                  }} />
+                </button>
+              </div>
+              {enabled && url && (
+                <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{
+                    flex: 1, minWidth: 0, fontSize: 11, color: "var(--text-3)",
+                    background: "var(--surface-2)", borderRadius: 6, padding: "6px 10px",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    border: "1px solid var(--border-soft)", fontFamily: "var(--mono)",
+                  }}>
+                    {url}
+                  </div>
+                  <button className="btn btn-sm" onClick={() => copyUrl(url, key)} style={{ flexShrink: 0 }}>
+                    {copied === key ? "Copied ✓" : "Copy URL"}
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {nfcToken && (
+        <div style={{ marginTop: 10, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <p className="tiny" style={{ color: "var(--text-3)", margin: 0 }}>
+            Write each URL to an NFC tag with the NFC Tools app.
+          </p>
+          <button className="btn btn-sm" onClick={regenerate} disabled={regenerating}
+            style={{ flexShrink: 0, marginLeft: 12 }}>
+            {regenerating ? "…" : "Reset token"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// Settings Tab
+// ============================================================
+
 export function SettingsTab({ state, setState }) {
   const areas = state.accounts || ACCOUNTS.map((a) => ({
     ...a,
@@ -1187,6 +1340,13 @@ export function SettingsTab({ state, setState }) {
         </div>
 
       </div>
+
+      {/* NFC Tags */}
+      <h3 className="section-title" style={{ marginTop: 32 }}>NFC Tags</h3>
+      <p className="tiny" style={{ marginBottom: 14, color: "var(--text-3)" }}>
+        Enable habits or routines for NFC tracking. Copy the URL to an NFC tag — tapping it logs the item as done for today.
+      </p>
+      <NfcTagsSection state={state} />
 
       {/* Version & Updates */}
       <h3 className="section-title" style={{ marginTop: 32 }}>About</h3>
