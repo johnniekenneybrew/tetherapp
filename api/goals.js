@@ -1,131 +1,135 @@
-import { notion, DB, ACC_MAP, ACC_REVERSE, P, p, queryAll, setCors } from "./_notion.js";
-import { getGoalTasksDbId } from "./_goal-tasks-db.js";
+import supabase, { setCors, getUid } from "./_supabase.js";
 
-const STATUS_MAP = {
-  "in-progress": "In Progress",
-  "completed":   "Completed",
-};
-const STATUS_REVERSE = Object.fromEntries(Object.entries(STATUS_MAP).map(([k, v]) => [v, k]));
-
-// Ensure Goals DB has KPI and GoalTasks properties
-let schemaReady = false;
-async function ensureGoalSchema() {
-  if (schemaReady) return;
-  try {
-    const [db, goalTasksDbId] = await Promise.all([
-      notion.databases.retrieve({ database_id: DB.GOALS }),
-      getGoalTasksDbId().catch(() => null),
-    ]);
-    const updates = {};
-    if (!db.properties.KPI) updates.KPI = { rich_text: {} };
-    if (!db.properties.GoalTasks && goalTasksDbId) {
-      updates.GoalTasks = { relation: { database_id: goalTasksDbId, single_property: {} } };
-    }
-    if (Object.keys(updates).length > 0) {
-      await notion.databases.update({ database_id: DB.GOALS, properties: updates });
-    }
-    schemaReady = true;
-  } catch (e) {
-    console.error("ensureGoalSchema failed", e);
-    schemaReady = true;
-  }
-}
-
-function toGoal(page) {
-  const props = page.properties;
+function toGoal(row, habitIds = [], taskIds = []) {
   return {
-    _pageId:  page.id,
-    id:       page.id,
-    name:     p.title(props.Name),
-    description: p.rich(props.Description) || "",
-    kpi:      p.rich(props.KPI) || "",
-    status:   STATUS_REVERSE[p.select(props.Status)] || "in-progress",
-    account:  ACC_REVERSE[p.select(props.Account)] || "personal",
-    target:   p.date(props["Target Date"]) || null,
-    habitIds: p.relation(props.Habits),
-    taskIds:  p.relation(props.GoalTasks),
+    _pageId:     row.id,
+    id:          row.id,
+    name:        row.name,
+    description: row.description,
+    kpi:         row.kpi,
+    status:      row.status,
+    account:     row.account,
+    target:      row.target_date || null,
+    habitIds,
+    taskIds,
   };
 }
 
-// ── Goal Tasks (merged to stay under Vercel Hobby 12-function limit) ─────────
-
-function toGoalTask(page) {
+function toGoalTask(row) {
   return {
-    _pageId: page.id,
-    id:      page.id,
-    name:    p.title(page.properties.Name),
-    done:    p.checkbox(page.properties.Done),
+    _pageId: row.id,
+    id:      row.id,
+    name:    row.name,
+    done:    row.done,
   };
 }
 
-async function handleGoalTasks(req, res) {
-  const dbId = await getGoalTasksDbId();
+async function handleGoalTasks(req, res, uid) {
   if (req.method === "GET") {
-    const [active, done] = await Promise.all([
-      queryAll(dbId, { property: "Done", checkbox: { equals: false } }),
-      queryAll(dbId, { property: "Done", checkbox: { equals: true } }),
-    ]);
-    return res.json([...active, ...done].map(toGoalTask));
+    const { data, error } = await supabase.from("goal_tasks")
+      .select("*").eq("user_id", uid).order("created_at");
+    if (error) throw error;
+    return res.json((data || []).map(toGoalTask));
   }
+
   if (req.method === "POST") {
-    const { name } = req.body;
+    const { name, goalId } = req.body;
     if (!name?.trim()) return res.status(400).json({ error: "name required" });
-    const page = await notion.pages.create({
-      parent: { database_id: dbId },
-      properties: { Name: P.title(name.trim()), Done: P.checkbox(false) },
-    });
-    return res.json(toGoalTask(page));
+    const { data: row, error } = await supabase.from("goal_tasks")
+      .insert({ user_id: uid, name: name.trim(), done: false, goal_id: goalId || null })
+      .select().single();
+    if (error) throw error;
+    return res.json(toGoalTask(row));
   }
+
   if (req.method === "PATCH") {
     const { id, ...patch } = req.body;
     if (!id) return res.status(400).json({ error: "id required" });
     const updates = {};
-    if (patch.name !== undefined) updates.Name = P.title(patch.name);
-    if (patch.done !== undefined) updates.Done = P.checkbox(!!patch.done);
-    const page = await notion.pages.update({ page_id: id, properties: updates });
-    return res.json(toGoalTask(page));
+    if (patch.name !== undefined) updates.name = patch.name;
+    if (patch.done !== undefined) updates.done = !!patch.done;
+    const { data: row, error } = await supabase.from("goal_tasks")
+      .update(updates).eq("id", id).eq("user_id", uid).select().single();
+    if (error) throw error;
+    return res.json(toGoalTask(row));
   }
+
   if (req.method === "DELETE") {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: "id required" });
-    await notion.pages.update({ page_id: id, archived: true });
+    const { error } = await supabase.from("goal_tasks")
+      .delete().eq("id", id).eq("user_id", uid);
+    if (error) throw error;
     return res.json({ ok: true });
   }
+
   return res.status(405).json({ error: "Method not allowed" });
 }
-
-// ── Goals ─────────────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === "OPTIONS") return res.status(200).end();
 
   try {
-    if (req.query.tasks) return handleGoalTasks(req, res);
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
 
-    await ensureGoalSchema();
+    if (req.query.tasks) return handleGoalTasks(req, res, uid);
 
     if (req.method === "GET") {
-      const pages = await queryAll(DB.GOALS);
-      return res.json(pages.map(toGoal));
+      const { data: goals, error: goalsErr } = await supabase.from("goals")
+        .select("*").eq("user_id", uid).order("created_at");
+      if (goalsErr) throw goalsErr;
+
+      if (!goals?.length) return res.json([]);
+
+      const goalIds = goals.map((g) => g.id);
+      const [{ data: links }, { data: tasks }] = await Promise.all([
+        supabase.from("goal_habit_links").select("goal_id, habit_id").in("goal_id", goalIds),
+        supabase.from("goal_tasks").select("id, goal_id").eq("user_id", uid).in("goal_id", goalIds),
+      ]);
+
+      const habitIdsByGoal = {};
+      for (const link of (links || [])) {
+        if (!habitIdsByGoal[link.goal_id]) habitIdsByGoal[link.goal_id] = [];
+        habitIdsByGoal[link.goal_id].push(link.habit_id);
+      }
+
+      const taskIdsByGoal = {};
+      for (const task of (tasks || [])) {
+        if (task.goal_id) {
+          if (!taskIdsByGoal[task.goal_id]) taskIdsByGoal[task.goal_id] = [];
+          taskIdsByGoal[task.goal_id].push(task.id);
+        }
+      }
+
+      return res.json(goals.map((g) =>
+        toGoal(g, habitIdsByGoal[g.id] || [], taskIdsByGoal[g.id] || [])
+      ));
     }
 
     if (req.method === "POST") {
       const { name, description, kpi, status, account, target, habitIds, taskIds } = req.body;
-      const page = await notion.pages.create({
-        parent: { database_id: DB.GOALS },
-        properties: {
-          Name:          P.title(name),
-          Description:   P.rich(description || ""),
-          KPI:           P.rich(kpi || ""),
-          Status:        P.select(STATUS_MAP[status] || "In Progress"),
-          Account:       P.select(ACC_MAP[account] || "Personal"),
-          "Target Date": P.date(target || null),
-          Habits:        P.relation(habitIds || []),
-          GoalTasks:     P.relation(taskIds || []),
-        },
-      });
-      return res.json(toGoal(page));
+      const { data: row, error } = await supabase.from("goals")
+        .insert({
+          user_id: uid, name: name || "", description: description || "",
+          kpi: kpi || "", status: status || "in-progress",
+          account: account || "personal", target_date: target || null,
+        })
+        .select().single();
+      if (error) throw error;
+
+      if (habitIds?.length > 0) {
+        await supabase.from("goal_habit_links")
+          .insert(habitIds.map((hid) => ({ goal_id: row.id, habit_id: hid })));
+      }
+
+      if (taskIds?.length > 0) {
+        await supabase.from("goal_tasks").update({ goal_id: row.id })
+          .in("id", taskIds).eq("user_id", uid);
+      }
+
+      return res.json(toGoal(row, habitIds || [], taskIds || []));
     }
 
     if (req.method === "PATCH") {
@@ -133,23 +137,62 @@ export default async function handler(req, res) {
       if (!id) return res.status(400).json({ error: "id required" });
 
       const updates = {};
-      if (patch.name        !== undefined) updates.Name           = P.title(patch.name);
-      if (patch.description !== undefined) updates.Description    = P.rich(patch.description || "");
-      if (patch.kpi         !== undefined) updates.KPI            = P.rich(patch.kpi || "");
-      if (patch.status      !== undefined) updates.Status         = P.select(STATUS_MAP[patch.status] || "In Progress");
-      if (patch.account     !== undefined) updates.Account        = P.select(ACC_MAP[patch.account] || "Personal");
-      if (patch.target      !== undefined) updates["Target Date"] = P.date(patch.target || null);
-      if (patch.habitIds    !== undefined) updates.Habits         = P.relation(patch.habitIds || []);
-      if (patch.taskIds     !== undefined) updates.GoalTasks      = P.relation(patch.taskIds || []);
+      if (patch.name        !== undefined) updates.name        = patch.name;
+      if (patch.description !== undefined) updates.description = patch.description || "";
+      if (patch.kpi         !== undefined) updates.kpi         = patch.kpi || "";
+      if (patch.status      !== undefined) updates.status      = patch.status;
+      if (patch.account     !== undefined) updates.account     = patch.account;
+      if (patch.target      !== undefined) updates.target_date = patch.target || null;
 
-      const page = await notion.pages.update({ page_id: id, properties: updates });
-      return res.json(toGoal(page));
+      let row;
+      if (Object.keys(updates).length > 0) {
+        const { data, error } = await supabase.from("goals")
+          .update(updates).eq("id", id).eq("user_id", uid).select().single();
+        if (error) throw error;
+        row = data;
+      } else {
+        const { data, error } = await supabase.from("goals")
+          .select("*").eq("id", id).eq("user_id", uid).single();
+        if (error) throw error;
+        row = data;
+      }
+
+      if (patch.habitIds !== undefined) {
+        await supabase.from("goal_habit_links").delete().eq("goal_id", id);
+        if (patch.habitIds.length > 0) {
+          await supabase.from("goal_habit_links")
+            .insert(patch.habitIds.map((hid) => ({ goal_id: id, habit_id: hid })));
+        }
+      }
+
+      if (patch.taskIds !== undefined) {
+        await supabase.from("goal_tasks").update({ goal_id: null })
+          .eq("goal_id", id).eq("user_id", uid);
+        if (patch.taskIds.length > 0) {
+          await supabase.from("goal_tasks").update({ goal_id: id })
+            .in("id", patch.taskIds).eq("user_id", uid);
+        }
+      }
+
+      // Return fresh link counts
+      const [{ data: links }, { data: tasks }] = await Promise.all([
+        supabase.from("goal_habit_links").select("habit_id").eq("goal_id", id),
+        supabase.from("goal_tasks").select("id").eq("goal_id", id).eq("user_id", uid),
+      ]);
+
+      return res.json(toGoal(
+        row,
+        (links || []).map((l) => l.habit_id),
+        (tasks || []).map((t) => t.id),
+      ));
     }
 
     if (req.method === "DELETE") {
       const { id } = req.body;
       if (!id) return res.status(400).json({ error: "id required" });
-      await notion.pages.update({ page_id: id, archived: true });
+      const { error } = await supabase.from("goals")
+        .delete().eq("id", id).eq("user_id", uid);
+      if (error) throw error;
       return res.json({ ok: true });
     }
 

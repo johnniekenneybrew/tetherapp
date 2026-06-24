@@ -1,8 +1,6 @@
-import { notion, DB, P, queryAll, setCors } from "./_notion.js";
+import supabase, { setCors } from "./_supabase.js";
 import { getPref, setPref } from "./_prefs.js";
 import crypto from "crypto";
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -33,53 +31,27 @@ function tapHtml(title, message, isError = false) {
     <span class="icon">${icon}</span>
     <h1>${title}</h1>
     <p>${message}</p>
-    <div class="status"><span class="dot"></span>${isError ? "Not logged" : "Logged to Notion"}</div>
+    <div class="status"><span class="dot"></span>${isError ? "Not logged" : "Saved"}</div>
   </div>
 </body>
 </html>`;
 }
 
-async function logRoutine(id, date) {
-  const pages = await queryAll(DB.ROUTINE_LOG, {
-    and: [
-      { property: "Log Date", date: { equals: date } },
-      { property: "Routine", relation: { contains: id } },
-    ],
-  });
-  if (pages.length > 0) {
-    await notion.pages.update({ page_id: pages[0].id, properties: { Done: P.checkbox(true) } });
-  } else {
-    await notion.pages.create({
-      parent: { database_id: DB.ROUTINE_LOG },
-      properties: {
-        Date: P.title(date), "Log Date": P.date(date),
-        Routine: P.relation([id]), Done: P.checkbox(true),
-      },
-    });
-  }
+async function logRoutine(id, date, uid) {
+  const { error } = await supabase.from("routine_log").upsert(
+    { user_id: uid, routine_id: id, log_date: date, done: true },
+    { onConflict: "routine_id,log_date" }
+  );
+  if (error) throw error;
 }
 
-async function logHabit(id, date) {
-  const pages = await queryAll(DB.HABIT_LOG, {
-    and: [
-      { property: "Log Date", date: { equals: date } },
-      { property: "Habit", relation: { contains: id } },
-    ],
-  });
-  if (pages.length > 0) {
-    await notion.pages.update({ page_id: pages[0].id, properties: { Done: P.checkbox(true) } });
-  } else {
-    await notion.pages.create({
-      parent: { database_id: DB.HABIT_LOG },
-      properties: {
-        Date: P.title(date), "Log Date": P.date(date),
-        Habit: P.relation([id]), Done: P.checkbox(true),
-      },
-    });
-  }
+async function logHabit(id, date, uid) {
+  const { error } = await supabase.from("habit_log").upsert(
+    { user_id: uid, habit_id: id, log_date: date, done: true },
+    { onConflict: "habit_id,log_date" }
+  );
+  if (error) throw error;
 }
-
-// ── Tap handler (returns HTML — called directly from NFC tag URL) ─────────────
 
 async function handleTap(req, res) {
   res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -100,7 +72,6 @@ async function handleTap(req, res) {
     return res.status(401).send(tapHtml("Invalid Token", "This NFC tag is no longer valid. Regenerate the URL in Settings.", true));
   }
 
-  // Look up the item name from saved nfc-items
   let itemName = type === "routine" ? "Routine" : "Habit";
   try {
     const items = await getPref("nfc-items", uid);
@@ -114,9 +85,9 @@ async function handleTap(req, res) {
 
   try {
     if (type === "routine") {
-      await logRoutine(id, date);
+      await logRoutine(id, date, uid);
     } else if (type === "habit") {
-      await logHabit(id, date);
+      await logHabit(id, date, uid);
     } else {
       return res.status(400).send(tapHtml("Invalid Type", "Type must be routine or habit.", true));
     }
@@ -130,8 +101,6 @@ async function handleTap(req, res) {
   });
   return res.status(200).send(tapHtml(itemName, `Logged for ${dateStr}`));
 }
-
-// ── Settings handler (JSON — called from app) ─────────────────────────────────
 
 async function handleSettings(req, res) {
   setCors(res);
@@ -165,8 +134,6 @@ async function handleSettings(req, res) {
 
   return res.status(405).json({ error: "Method not allowed" });
 }
-
-// ── Router ────────────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") {

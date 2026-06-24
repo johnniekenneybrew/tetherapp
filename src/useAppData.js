@@ -5,7 +5,7 @@ import {
   tasksApi, checkinApi, habitsApi, habitLogApi,
   routinesApi, routineLogApi, goalsApi, goalTasksApi,
   contactsApi, contactNotesApi, contactGroupsApi,
-  prefsApi,
+  prefsApi, setApiUser,
 } from './api';
 
 // ============================================================
@@ -87,6 +87,8 @@ export function useAppData() {
   // Load everything on mount
   // ============================================================
   useEffect(() => {
+    if (!userId) return;
+    setApiUser(userId);
     async function loadAll() {
       try {
         const [
@@ -168,7 +170,7 @@ export function useAppData() {
       }
     }
     loadAll();
-  }, []);
+  }, [userId]);
 
   // ============================================================
   // setState shim — keeps components working as-is
