@@ -4,11 +4,15 @@
 
 const BASE = "/api";
 
+let _uid = null;
+export function setApiUser(uid) { _uid = uid; }
+
 async function req(method, path, body) {
   const opts = {
     method,
     headers: { "Content-Type": "application/json" },
   };
+  if (_uid) opts.headers["X-User-Id"] = _uid;
   if (body !== undefined) opts.body = JSON.stringify(body);
   const res = await fetch(`${BASE}${path}`, opts);
   if (!res.ok) {
@@ -130,7 +134,7 @@ export const goalTasksApi = {
 };
 
 // ============================================================
-// User preferences (cross-device, Notion-backed)
+// User preferences (cross-device, Supabase-backed)
 // ============================================================
 export const prefsApi = {
   get: (key, userId) => get("/prefs", { key, userId }),

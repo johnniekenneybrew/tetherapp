@@ -1,75 +1,49 @@
-import { notion, DB, P, p, queryAll, setCors } from "./_notion.js";
+import supabase, { setCors, getUid } from "./_supabase.js";
 
-// ── Routine Log (merged to stay under Vercel Hobby 12-function limit) ─────────
-
-function toLogEntry(page) {
-  const props = page.properties;
+function toRoutine(row) {
   return {
-    _pageId: page.id,
-    date: p.date(props["Log Date"]),
-    routineId: p.relation(props.Routine)[0] || null,
-    done: p.checkbox(props.Done),
+    _pageId:   row.id,
+    id:        row.id,
+    name:      row.name,
+    icon:      row.icon,
+    useIcon:   row.use_icon,
+    trackOnly: row.track_only,
+    active:    row.active,
   };
 }
 
-async function handleRoutineLog(req, res) {
+async function handleRoutineLog(req, res, uid) {
   if (req.method === "GET") {
     const { from, to } = req.query;
     if (!from || !to) return res.status(400).json({ error: "from and to required" });
-    const pages = await queryAll(DB.ROUTINE_LOG, {
-      and: [
-        { property: "Log Date", date: { on_or_after: from } },
-        { property: "Log Date", date: { on_or_before: to } },
-      ],
-    });
+
+    const { data, error } = await supabase.from("routine_log").select("*")
+      .eq("user_id", uid)
+      .gte("log_date", from)
+      .lte("log_date", to);
+    if (error) throw error;
+
     const log = {};
-    for (const page of pages) {
-      const e = toLogEntry(page);
-      if (!e.date || !e.routineId) continue;
-      if (!log[e.date]) log[e.date] = {};
-      log[e.date][e.routineId] = e.done;
+    for (const row of (data || [])) {
+      if (!log[row.log_date]) log[row.log_date] = {};
+      log[row.log_date][row.routine_id] = row.done;
     }
     return res.json(log);
   }
+
   if (req.method === "PATCH") {
     const { date, routineId, done } = req.body;
     if (!date || !routineId) return res.status(400).json({ error: "date and routineId required" });
-    const pages = await queryAll(DB.ROUTINE_LOG, {
-      and: [
-        { property: "Log Date", date: { equals: date } },
-        { property: "Routine", relation: { contains: routineId } },
-      ],
-    });
-    let page;
-    if (pages.length > 0) {
-      page = await notion.pages.update({ page_id: pages[0].id, properties: { Done: P.checkbox(done) } });
-    } else {
-      page = await notion.pages.create({
-        parent: { database_id: DB.ROUTINE_LOG },
-        properties: {
-          Date: P.title(date), "Log Date": P.date(date),
-          Routine: P.relation([routineId]), Done: P.checkbox(done),
-        },
-      });
-    }
-    return res.json(toLogEntry(page));
+
+    const { error } = await supabase.from("routine_log").upsert(
+      { user_id: uid, routine_id: routineId, log_date: date, done: !!done },
+      { onConflict: "routine_id,log_date" }
+    );
+    if (error) throw error;
+    return res.json({ date, routineId, done: !!done });
   }
+
   return res.status(405).json({ error: "Method not allowed" });
-}
-
-// ── Routines ──────────────────────────────────────────────────────────────────
-
-function toRoutine(page) {
-  const props = page.properties;
-  return {
-    _pageId: page.id,
-    id: page.id,
-    name: p.title(props.Name),
-    icon: p.rich(props.Icon) || "✨",
-    useIcon: p.checkbox(props["Use Icon"]),
-    trackOnly: p.checkbox(props["Track Only"]),
-    active: p.checkbox(props.Active),
-  };
 }
 
 export default async function handler(req, res) {
@@ -77,26 +51,29 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
 
   try {
-    if (req.query.log) return handleRoutineLog(req, res);
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    if (req.query.log) return handleRoutineLog(req, res, uid);
 
     if (req.method === "GET") {
-      const pages = await queryAll(DB.ROUTINES);
-      return res.json(pages.map(toRoutine));
+      const { data, error } = await supabase.from("routines").select("*")
+        .eq("user_id", uid).order("created_at");
+      if (error) throw error;
+      return res.json((data || []).map(toRoutine));
     }
 
     if (req.method === "POST") {
       const { name, icon, useIcon, trackOnly } = req.body;
-      const page = await notion.pages.create({
-        parent: { database_id: DB.ROUTINES },
-        properties: {
-          Name:         P.title(name),
-          Icon:         P.rich(icon || "✨"),
-          "Use Icon":   P.checkbox(useIcon ?? true),
-          "Track Only": P.checkbox(trackOnly ?? false),
-          Active:       P.checkbox(true),
-        },
-      });
-      return res.json(toRoutine(page));
+      const { data: row, error } = await supabase.from("routines")
+        .insert({
+          user_id: uid, name: name || "",
+          icon: icon || "✨", use_icon: useIcon ?? true,
+          track_only: trackOnly ?? false, active: true,
+        })
+        .select().single();
+      if (error) throw error;
+      return res.json(toRoutine(row));
     }
 
     if (req.method === "PATCH") {
@@ -104,20 +81,23 @@ export default async function handler(req, res) {
       if (!id) return res.status(400).json({ error: "id required" });
 
       const updates = {};
-      if (patch.name      !== undefined) updates.Name           = P.title(patch.name);
-      if (patch.icon      !== undefined) updates.Icon           = P.rich(patch.icon || "");
-      if (patch.useIcon   !== undefined) updates["Use Icon"]    = P.checkbox(patch.useIcon);
-      if (patch.trackOnly !== undefined) updates["Track Only"]  = P.checkbox(patch.trackOnly);
-      if (patch.active    !== undefined) updates.Active         = P.checkbox(patch.active);
+      if (patch.name      !== undefined) updates.name       = patch.name;
+      if (patch.icon      !== undefined) updates.icon       = patch.icon || "✨";
+      if (patch.useIcon   !== undefined) updates.use_icon   = !!patch.useIcon;
+      if (patch.trackOnly !== undefined) updates.track_only = !!patch.trackOnly;
+      if (patch.active    !== undefined) updates.active     = !!patch.active;
 
-      const page = await notion.pages.update({ page_id: id, properties: updates });
-      return res.json(toRoutine(page));
+      const { data: row, error } = await supabase.from("routines")
+        .update(updates).eq("id", id).eq("user_id", uid).select().single();
+      if (error) throw error;
+      return res.json(toRoutine(row));
     }
 
     if (req.method === "DELETE") {
       const { id } = req.body;
       if (!id) return res.status(400).json({ error: "id required" });
-      await notion.pages.update({ page_id: id, archived: true });
+      const { error } = await supabase.from("routines").delete().eq("id", id).eq("user_id", uid);
+      if (error) throw error;
       return res.json({ ok: true });
     }
 

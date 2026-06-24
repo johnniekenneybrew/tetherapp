@@ -1,75 +1,48 @@
-import { notion, DB, ACC_MAP, ACC_REVERSE, P, p, queryAll, setCors } from "./_notion.js";
+import supabase, { setCors, getUid } from "./_supabase.js";
 
-// ── Habit Log (merged to stay under Vercel Hobby 12-function limit) ──────────
-
-function toLogEntry(page) {
-  const props = page.properties;
+function toHabit(row) {
   return {
-    _pageId: page.id,
-    date: p.date(props["Log Date"]),
-    habitId: p.relation(props.Habit)[0] || null,
-    done: p.checkbox(props.Done),
+    _pageId: row.id,
+    id:      row.id,
+    name:    row.name,
+    target:  row.target,
+    account: row.account,
+    active:  row.active,
   };
 }
 
-async function handleHabitLog(req, res) {
+async function handleHabitLog(req, res, uid) {
   if (req.method === "GET") {
     const { from, to } = req.query;
     if (!from || !to) return res.status(400).json({ error: "from and to required" });
-    const pages = await queryAll(DB.HABIT_LOG, {
-      and: [
-        { property: "Log Date", date: { on_or_after: from } },
-        { property: "Log Date", date: { on_or_before: to } },
-      ],
-    });
+
+    const { data, error } = await supabase.from("habit_log").select("*")
+      .eq("user_id", uid)
+      .gte("log_date", from)
+      .lte("log_date", to);
+    if (error) throw error;
+
     const log = {};
-    for (const page of pages) {
-      const e = toLogEntry(page);
-      if (!e.date || !e.habitId) continue;
-      if (!log[e.date]) log[e.date] = {};
-      log[e.date][e.habitId] = e.done;
+    for (const row of (data || [])) {
+      if (!log[row.log_date]) log[row.log_date] = {};
+      log[row.log_date][row.habit_id] = row.done;
     }
     return res.json(log);
   }
+
   if (req.method === "PATCH") {
     const { date, habitId, done } = req.body;
     if (!date || !habitId) return res.status(400).json({ error: "date and habitId required" });
-    const pages = await queryAll(DB.HABIT_LOG, {
-      and: [
-        { property: "Log Date", date: { equals: date } },
-        { property: "Habit", relation: { contains: habitId } },
-      ],
-    });
-    let page;
-    if (pages.length > 0) {
-      page = await notion.pages.update({ page_id: pages[0].id, properties: { Done: P.checkbox(done) } });
-    } else {
-      page = await notion.pages.create({
-        parent: { database_id: DB.HABIT_LOG },
-        properties: {
-          Date: P.title(date), "Log Date": P.date(date),
-          Habit: P.relation([habitId]), Done: P.checkbox(done),
-        },
-      });
-    }
-    return res.json(toLogEntry(page));
+
+    const { error } = await supabase.from("habit_log").upsert(
+      { user_id: uid, habit_id: habitId, log_date: date, done: !!done },
+      { onConflict: "habit_id,log_date" }
+    );
+    if (error) throw error;
+    return res.json({ date, habitId, done: !!done });
   }
+
   return res.status(405).json({ error: "Method not allowed" });
-}
-
-// ── Habits ────────────────────────────────────────────────────────────────────
-
-function toHabit(page) {
-  const props = page.properties;
-  return {
-    _pageId: page.id,
-    id: page.id,
-    name: p.title(props.Name),
-    target: p.number(props["Target Per Week"]) ?? 5,
-    account: ACC_REVERSE[p.select(props.Account)] || "personal",
-    active: p.checkbox(props.Active),
-    goals: p.relation(props.Goals),
-  };
 }
 
 export default async function handler(req, res) {
@@ -77,26 +50,25 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return res.status(200).end();
 
   try {
-    if (req.query.log) return handleHabitLog(req, res);
+    const uid = getUid(req);
+    if (!uid) return res.status(401).json({ error: "Unauthorized" });
+
+    if (req.query.log) return handleHabitLog(req, res, uid);
 
     if (req.method === "GET") {
-      const pages = await queryAll(DB.HABITS);
-      return res.json(pages.map(toHabit));
+      const { data, error } = await supabase.from("habits").select("*")
+        .eq("user_id", uid).order("created_at");
+      if (error) throw error;
+      return res.json((data || []).map(toHabit));
     }
 
     if (req.method === "POST") {
-      const { name, target, account, goals } = req.body;
-      const page = await notion.pages.create({
-        parent: { database_id: DB.HABITS },
-        properties: {
-          Name:              P.title(name),
-          "Target Per Week": P.number(target ?? 5),
-          Account:           P.select(ACC_MAP[account] || "Personal"),
-          Active:            P.checkbox(true),
-          Goals:             P.relation(goals || []),
-        },
-      });
-      return res.json(toHabit(page));
+      const { name, target, account, active } = req.body;
+      const { data: row, error } = await supabase.from("habits")
+        .insert({ user_id: uid, name: name || "", target: target ?? 5, account: account || "personal", active: active ?? true })
+        .select().single();
+      if (error) throw error;
+      return res.json(toHabit(row));
     }
 
     if (req.method === "PATCH") {
@@ -104,20 +76,22 @@ export default async function handler(req, res) {
       if (!id) return res.status(400).json({ error: "id required" });
 
       const updates = {};
-      if (patch.name    !== undefined) updates.Name               = P.title(patch.name);
-      if (patch.target  !== undefined) updates["Target Per Week"] = P.number(patch.target);
-      if (patch.account !== undefined) updates.Account            = P.select(ACC_MAP[patch.account] || "Personal");
-      if (patch.active  !== undefined) updates.Active             = P.checkbox(patch.active);
-      if (patch.goals   !== undefined) updates.Goals              = P.relation(patch.goals || []);
+      if (patch.name    !== undefined) updates.name    = patch.name;
+      if (patch.target  !== undefined) updates.target  = patch.target;
+      if (patch.account !== undefined) updates.account = patch.account;
+      if (patch.active  !== undefined) updates.active  = !!patch.active;
 
-      const page = await notion.pages.update({ page_id: id, properties: updates });
-      return res.json(toHabit(page));
+      const { data: row, error } = await supabase.from("habits")
+        .update(updates).eq("id", id).eq("user_id", uid).select().single();
+      if (error) throw error;
+      return res.json(toHabit(row));
     }
 
     if (req.method === "DELETE") {
       const { id } = req.body;
       if (!id) return res.status(400).json({ error: "id required" });
-      await notion.pages.update({ page_id: id, archived: true });
+      const { error } = await supabase.from("habits").delete().eq("id", id).eq("user_id", uid);
+      if (error) throw error;
       return res.json({ ok: true });
     }
 
