@@ -306,6 +306,18 @@ export function useAppData() {
 
     // ---------- ROUTINES ----------
 
+    addRoutine(routine) {
+      const tempId = "r-" + Date.now();
+      const newRoutine = { ...routine, id: tempId };
+      setState((s) => ({ ...s, routines: [...s.routines, newRoutine] }));
+      routinesApi.create(routine).then((created) => {
+        setState((s) => ({
+          ...s,
+          routines: s.routines.map((r) => r.id === tempId ? { ...r, id: created.id, _pageId: created.id } : r),
+        }));
+      }).catch(console.error);
+    },
+
     updateRoutine(id, patch) {
       setState((s) => ({
         ...s,

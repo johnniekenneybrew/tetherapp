@@ -1093,11 +1093,12 @@ textarea.input.is-filled--green {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  overflow: hidden;
+  overflow-x: auto;
   box-shadow: var(--shadow-sm);
 }
 .habits-table table {
   width: 100%;
+  min-width: 640px;
   border-collapse: collapse;
 }
 .habits-table th, .habits-table td {

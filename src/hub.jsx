@@ -17,11 +17,17 @@ export function HabitsHub({ state, setState, sub, setSub, actions }) {
     { id: "goals", label: "Goals" },
     { id: "wam", label: "WAM" },
   ];
+  const todayWeek = weekStart(TODAY);
+  const qMonth = TODAY.getMonth();
+  const q = Math.floor(qMonth / 3) + 1;
+  const qStart = new Date(TODAY.getFullYear(), Math.floor(qMonth / 3) * 3, 1);
+  const qWeekNum = Math.max(1, Math.floor((todayWeek - qStart) / (7 * 24 * 60 * 60 * 1000)) + 1);
+  const quarterLabel = `Q${q} ${TODAY.getFullYear()} · Week ${qWeekNum}`;
   return (
     <div className="page fade-in">
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between" }}>
         <h1 className="page-title">Habits + Health</h1>
-        <span className="tiny">Q2 2026 · Week 7 of 12</span>
+        <span className="tiny">{quarterLabel}</span>
       </div>
       <p className="page-sub">Track habits, build routines, and watch quarterly goals move.</p>
 
@@ -268,6 +274,7 @@ function RoutinesTab({ state, setState, actions }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
   const dayLetters = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const [editingId, setEditingId] = useState(null);
+  const [showAddRoutine, setShowAddRoutine] = useState(false);
   const [dragColId, setDragColId] = useState(null);
   const [dragOverColId, setDragOverColId] = useState(null);
 
@@ -344,7 +351,7 @@ function RoutinesTab({ state, setState, actions }) {
               ))}
               <th style={{ width: 110, textAlign: "right" }}>Completion</th>
               <th style={{ width: 36, padding: "9px 4px" }}>
-                <button className="routine-add-btn" title="Add routine">
+                <button className="routine-add-btn" title="Add routine" onClick={() => setShowAddRoutine(true)}>
                   <Icon.Plus />
                 </button>
               </th>
@@ -389,6 +396,10 @@ function RoutinesTab({ state, setState, actions }) {
           </tbody>
         </table>
       </div>
+      <div style={{ marginTop: 16 }}>
+        <button className="btn-link" onClick={() => setShowAddRoutine(true)}><Icon.Plus /> Add routine</button>
+      </div>
+      {showAddRoutine && <AddRoutineModal onClose={() => setShowAddRoutine(false)} actions={actions} />}
     </div>
   );
 }
@@ -453,6 +464,66 @@ function RoutineEditor({ routine, onSave, onClose }) {
       <div className="re-actions">
         <button className="btn" onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" onClick={submit}>Save</button>
+      </div>
+    </div>
+  );
+}
+
+// ----------- Add Routine modal -----------
+
+function AddRoutineModal({ onClose, actions }) {
+  const [name, setName] = useState("");
+  const [icon, setIcon] = useState("✨");
+  const [useIcon, setUseIcon] = useState(true);
+  const [trackOnly, setTrackOnly] = useState(false);
+
+  const save = () => {
+    if (!name.trim()) return;
+    actions.addRoutine({ name: name.trim(), icon, useIcon, trackOnly, active: true });
+    onClose();
+  };
+
+  return (
+    <div className="modal-back" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h3>New routine</h3>
+        <div className="tiny">Routines are daily non-negotiables — aim for 100%.</div>
+        <div className="field">
+          <label>Routine name</label>
+          <input className="input" placeholder="e.g. Morning pages" value={name}
+            onChange={(e) => setName(e.target.value)} autoFocus
+            onKeyDown={(e) => { if (e.key === "Enter") save(); }} />
+        </div>
+        <div className="field">
+          <label>Display as</label>
+          <div className="re-toggle" style={{ display: "inline-flex", marginBottom: 10 }}>
+            <button className={!useIcon ? "is-on" : ""} onClick={() => setUseIcon(false)}>Aa text</button>
+            <button className={useIcon ? "is-on" : ""} onClick={() => setUseIcon(true)}>😊 emoji</button>
+          </div>
+          {useIcon && (
+            <>
+              <div className="re-emoji-grid">
+                {EMOJI_PRESETS.map((e) => (
+                  <button key={e} className={"re-emoji" + (icon === e ? " is-on" : "")}
+                    onClick={() => setIcon(e)}>{e}</button>
+                ))}
+              </div>
+              <input className="input" style={{ marginTop: 6, fontSize: 13 }} value={icon} maxLength={4}
+                onChange={(e) => setIcon(e.target.value)} placeholder="…or paste emoji" />
+            </>
+          )}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderTop: "1px solid var(--border-soft)" }}>
+          <div>
+            <div style={{ fontSize: 13.5, fontWeight: 500 }}>Tracking only</div>
+            <div className="tiny">Won't count toward daily completion %</div>
+          </div>
+          <div className={"switch" + (trackOnly ? " on" : "")} onClick={() => setTrackOnly(!trackOnly)} />
+        </div>
+        <div className="actions">
+          <button className="btn" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={save} disabled={!name.trim()}>Add routine</button>
+        </div>
       </div>
     </div>
   );
@@ -875,11 +946,11 @@ function WamTab({ state }) {
   const weekLabel = weekOffset === 0 ? "This week" : weekOffset === -1 ? "Last week" : fmtRange(viewWeekStart, viewWeekEnd);
 
   const WeekNav = () => (
-    <div className="row" style={{ gap: 6 }}>
+    <div className="row" style={{ gap: 6, flexWrap: "wrap" }}>
       <button className="btn-text" onClick={() => setWeekOffset((o) => o - 1)} disabled={weekOffset <= -8}>
         <Icon.ChevL /> Previous
       </button>
-      <span style={{ fontSize: 13.5, fontWeight: 600, minWidth: 220, textAlign: "center" }}>
+      <span style={{ fontSize: 13.5, fontWeight: 600, textAlign: "center" }}>
         {qWeekLabel} · {fmtRange(viewWeekStart, viewWeekEnd)}
       </span>
       <button className="btn-text" onClick={() => setWeekOffset((o) => o + 1)} disabled={weekOffset >= 0}>
@@ -895,7 +966,7 @@ function WamTab({ state }) {
 
     return (
       <div>
-        <div className="row" style={{ justifyContent: "space-between", marginBottom: 18 }}>
+        <div className="row" style={{ justifyContent: "space-between", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
           <WeekNav />
           <select className="btn" value={selectedGoal} onChange={(e) => setSelectedGoal(e.target.value)}>
             <option value="all">All goals</option>
